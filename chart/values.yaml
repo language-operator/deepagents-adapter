@@ -7,7 +7,7 @@
 # and serves the deepagents agent over FastAPI.
 image:
   repository: ghcr.io/language-operator/deepagents-adapter
-  tag: 0.1.0
+  tag: 0.1.1
   pullPolicy: ""
 
 # Agents using this runtime sit behind the cluster OIDC proxy (when the cluster

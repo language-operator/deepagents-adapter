@@ -16,7 +16,8 @@ image:
 auth:
   enabled: true
 
-# HTTP port the FastAPI server listens on (/health, /invoke, /stream, /).
+# HTTP port the FastAPI server listens on (/health probe, / live UI, /events
+# SSE, /state, /resume, /restart).
 port: 8080
 
 resources:

@@ -1,9 +1,10 @@
 name: Release Helm Chart
 
 on:
+  # Tag-only: a versioned chart is published solely from a vX.Y.Z release tag, so
+  # the chart's pinned image.tag always has a matching image built by the same tag.
+  # (Plain main pushes must NOT publish a versioned chart — the image wouldn't exist.)
   push:
-    branches:
-      - main
     tags:
       - 'v*'
   workflow_dispatch:

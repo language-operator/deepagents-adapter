@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.helm-packages/
+*.tgz
+.DS_Store
+.claude/settings.json

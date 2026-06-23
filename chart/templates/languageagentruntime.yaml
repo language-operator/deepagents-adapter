@@ -1,0 +1,67 @@
+apiVersion: langop.io/v1alpha1
+kind: LanguageAgentRuntime
+metadata:
+  name: deepagents
+  labels:
+    {{- include "deepagents.labels" . | nindent 4 }}
+spec:
+  # Single image, single container, NO init adapter. server.py is our own code, so
+  # it reads the operator's /etc/agent/config.yaml directly at startup (translated
+  # by agent_config.py) — no config-translation init container is needed.
+  image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+
+  # Agents using this runtime sit behind the cluster OIDC proxy (when the cluster
+  # enables auth). The agent talks to the model gateway via MODEL_ENDPOINT; no
+  # interactive login and no real provider keys in the container.
+  auth:
+    enabled: {{ .Values.auth.enabled }}
+
+  ports:
+    - name: http
+      port: {{ .Values.port }}
+      protocol: TCP
+      expose: true
+
+  deployment:
+    {{- if .Values.image.pullPolicy }}
+    imagePullPolicy: {{ .Values.image.pullPolicy }}
+    {{- end }}
+
+    # We own the HTTP endpoint, so probe /health with httpGet (more precise than
+    # the tcpSocket probes the CLI-wrapping runtimes use). Readiness gating on
+    # /health keeps the pod out of rotation until the agent is built.
+    startupProbe:
+      httpGet:
+        path: /health
+        port: {{ .Values.port }}
+      initialDelaySeconds: 5
+      periodSeconds: 2
+      timeoutSeconds: 2
+      failureThreshold: 30
+
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: {{ .Values.port }}
+      periodSeconds: 15
+      timeoutSeconds: 3
+      failureThreshold: 3
+
+    readinessProbe:
+      httpGet:
+        path: /health
+        port: {{ .Values.port }}
+      periodSeconds: 10
+      timeoutSeconds: 3
+      successThreshold: 1
+      failureThreshold: 3
+
+    env:
+      # The image sets WorkingDir=/app; redirect HOME to the writable PVC.
+      - name: HOME
+        value: /workspace
+      - name: PYTHONUNBUFFERED
+        value: "1"
+
+    resources:
+      {{- toYaml .Values.resources | nindent 6 }}

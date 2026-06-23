@@ -1,0 +1,41 @@
+name: Release Helm Chart
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  CHART_REPO: oci://ghcr.io/language-operator/charts
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: 'latest'
+
+      - name: Log in to Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} \
+            --username ${{ github.actor }} --password-stdin
+
+      - name: Package and push chart
+        run: |
+          helm package chart -d .helm-packages
+          for pkg in .helm-packages/*.tgz; do
+            echo "Pushing $pkg to ${{ env.CHART_REPO }}"
+            helm push "$pkg" ${{ env.CHART_REPO }}
+          done

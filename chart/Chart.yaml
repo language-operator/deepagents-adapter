@@ -1,0 +1,17 @@
+apiVersion: v2
+name: deepagents
+description: deepagents LanguageAgentRuntime for the Language Operator
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - ai
+  - llm
+  - agents
+  - deepagents
+home: https://github.com/language-operator/deepagents-adapter
+sources:
+  - https://github.com/language-operator/deepagents-adapter
+maintainers:
+  - name: James Ryan
+    email: james@theryans.io

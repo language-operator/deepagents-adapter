@@ -1,0 +1,28 @@
+# deepagents LanguageAgentRuntime — a cluster-scoped runtime preset.
+# Requires the language-operator chart (which provides the LanguageAgentRuntime
+# CRD) to be installed first.
+
+# Single combined image built by this repo. Unlike the CLI-wrapping runtimes there
+# is no init container: server.py reads /etc/agent/config.yaml directly at startup
+# and serves the deepagents agent over FastAPI.
+image:
+  repository: ghcr.io/language-operator/deepagents-adapter
+  tag: 0.1.0
+  pullPolicy: ""
+
+# Agents using this runtime sit behind the cluster OIDC proxy (when the cluster
+# enables auth). All LLM traffic routes through the injected MODEL_ENDPOINT
+# gateway, so the agent never holds real provider keys.
+auth:
+  enabled: true
+
+# HTTP port the FastAPI server listens on (/health, /invoke, /stream, /).
+port: 8080
+
+resources:
+  requests:
+    memory: 512Mi
+    cpu: 250m
+  limits:
+    memory: 2Gi
+    cpu: 1000m

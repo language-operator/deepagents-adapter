@@ -1,0 +1,25 @@
+[project]
+name = "deepagents-adapter"
+version = "0.1.0"
+description = "deepagents LanguageAgentRuntime for the Language Operator"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "deepagents",
+    "langchain-openai",
+    "langchain-mcp-adapters",
+    "langgraph-checkpoint-sqlite",
+    "fastapi",
+    "uvicorn[standard]",
+    "pyyaml",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]

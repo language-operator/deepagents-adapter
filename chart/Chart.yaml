@@ -2,8 +2,8 @@ apiVersion: v2
 name: deepagents
 description: deepagents LanguageAgentRuntime for the Language Operator
 type: application
-version: 0.1.1
-appVersion: "0.1.1"
+version: 0.1.2
+appVersion: "0.1.2"
 keywords:
   - ai
   - llm

@@ -25,8 +25,8 @@ A **single combined image** plus a **Helm chart** that registers a
     `GET /events` (SSE: replay + live), `GET /state` (status + pending interrupt),
     `POST /resume` (`{decisions:[…]}` — approve/reject), `POST /restart`.
   - `agent_config.py` — the pure config-translation core (model selection, persona
-    system prompt, task/instructions, MCP server map, interrupt policy, env-var
-    fallbacks). This is what the tests target.
+    system prompt, task/instructions, MCP server map, interrupt policy, A2A card /
+    skills / peer map, env-var fallbacks). This is what the tests target.
   - Session state persists across restarts via a LangGraph SQLite checkpointer on
     the `/workspace` PVC.
 - **Chart** (`chart/`) — a cluster-scoped `LanguageAgentRuntime` named `deepagents`
@@ -60,6 +60,41 @@ spec:
 The agent runs its `instructions` on startup. Watch it with `kubectl logs`, or
 `kubectl port-forward` and open `/` for the live view (streaming output, HITL
 Approve/Reject buttons, and Restart).
+
+## A2A (Agent2Agent)
+
+deepagents agents can delegate to each other natively over
+[A2A](https://a2a-protocol.org). It's **additive** and off by default — it shares
+this runtime's existing FastAPI server (port 8080), built on the official
+[`a2a-sdk`](https://github.com/a2aproject/a2a-python) (native A2A **v1** JSON-RPC).
+Two roles, set via env (the operator injects them per `LanguageAgent`):
+
+**Server (the "specialist")** — `A2A_MODE=server` makes the runtime *request-driven*:
+it serves an Agent Card and answers JSON-RPC calls instead of auto-running
+`instructions`.
+
+- `GET /.well-known/agent-card.json` — the Agent Card (name, in-cluster `url`,
+  version, capabilities, and `skills`).
+- JSON-RPC at `POST /` — `message/send` runs the agent on the incoming message
+  (fresh thread per task) and returns a **completed Task** whose artifact is the
+  answer; `tasks/get` reads it back. Backed by an in-memory task store. HITL is
+  disabled in server mode (a synchronous request has no human to resume).
+- `A2A_SKILLS` — comma-separated skill ids to advertise (or a richer
+  `a2a.skills:` block — `{id,name,description,tags}` — in `config.yaml`).
+- `A2A_PUBLIC_URL` — override the advertised `url` (default: the in-cluster service
+  address `http://<name>.<namespace>.svc.cluster.local:<port>`).
+
+**Client (the "orchestrator")** — `A2A_PEERS` (comma-separated peer base URLs, or a
+`peers:` block in `config.yaml`) gives the autonomous agent a `delegate_to_<peer>`
+tool per peer — alongside its MCP tools — that performs an A2A `message/send` and
+returns the peer's answer. The orchestrator stays autonomous; its `instructions`
+tell it when to delegate.
+
+With none of these set, behavior is unchanged (autonomous single run).
+
+> MVP scope: synchronous `message/send` only. No `message/stream`, push
+> notifications, gRPC/REST transports, or auth/`securitySchemes` (isolation relies
+> on the operator's agent-to-agent NetworkPolicy).
 
 ## Development
 

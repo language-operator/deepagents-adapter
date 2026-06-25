@@ -12,6 +12,8 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "pyyaml",
+    "a2a-sdk[fastapi]>=1.1.0",
+    "httpx>=0.28.1",
 ]
 
 [dependency-groups]

@@ -42,6 +42,17 @@ FULL_CONFIG = textwrap.dedent(
         provider: anthropic
         model: claude-sonnet-4-6
         endpoint: http://gateway.default.svc.cluster.local:8000
+    a2a:
+      skills:
+        - id: research
+          name: Research
+          description: Investigate a topic and cite sources.
+          tags: [research, web]
+    peers:
+      summarizer:
+        url: http://summarizer.default.svc.cluster.local:8080
+      legacy-grpc:
+        url: grpc://legacy.default.svc.cluster.local:9000
     """
 )
 
@@ -69,6 +80,14 @@ def clean_env(monkeypatch):
         "AGENT_PERSONA",
         "AGENT_REPO_DIR",
         "HITL_TOOLS",
+        "A2A_MODE",
+        "A2A_SKILLS",
+        "A2A_PEERS",
+        "A2A_PUBLIC_URL",
+        "A2A_VERSION",
+        "AGENT_NAME",
+        "AGENT_NAMESPACE",
+        "PORT",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -216,6 +235,10 @@ def test_graceful_empty(tmp_path, monkeypatch):
     assert agent_config.build_system_prompt(cfg) == ""
     assert agent_config.build_task(cfg) == ""
     assert agent_config.build_mcp_servers(cfg) == {}
+    # A2A degrades to empty too (no skills, no peers, autonomous mode)
+    assert agent_config.a2a_mode() == ""
+    assert agent_config.build_a2a_skills(cfg) == []
+    assert agent_config.build_peers(cfg) == {}
 
 
 def test_interrupt_on_default_no_tools():
@@ -258,3 +281,76 @@ def test_persona_explicit_system_prompt(write_config):
     )
     prompt = agent_config.build_system_prompt(cfg)
     assert prompt == "You are a terse code reviewer."
+
+
+# --------------------------------------------------------------------------- #
+# A2A (Agent2Agent) helpers
+# --------------------------------------------------------------------------- #
+def test_a2a_mode(monkeypatch):
+    assert agent_config.a2a_mode() == ""
+    monkeypatch.setenv("A2A_MODE", "Server")
+    assert agent_config.a2a_mode() == "server"  # lower-cased + stripped
+
+
+def test_a2a_skills_from_config(write_config):
+    cfg = agent_config.load_operator_config(write_config(FULL_CONFIG))
+    skills = agent_config.build_a2a_skills(cfg)
+    assert skills == [
+        {
+            "id": "research",
+            "name": "Research",
+            "description": "Investigate a topic and cite sources.",
+            "tags": ["research", "web"],
+        }
+    ]
+
+
+def test_a2a_skills_from_env(monkeypatch):
+    monkeypatch.setenv("A2A_SKILLS", "research, summarize ,")  # spaces + trailing comma
+    skills = agent_config.build_a2a_skills({})
+    assert skills == [
+        {"id": "research", "name": "research", "description": "", "tags": []},
+        {"id": "summarize", "name": "summarize", "description": "", "tags": []},
+    ]
+
+
+def test_a2a_card_constructed_url(write_config, monkeypatch):
+    monkeypatch.setenv("AGENT_NAME", "research-agent")
+    monkeypatch.setenv("AGENT_NAMESPACE", "agents")
+    monkeypatch.setenv("PORT", "9000")
+    cfg = agent_config.load_operator_config(write_config(FULL_CONFIG))
+    card = agent_config.build_a2a_card(cfg)
+    assert card["name"] == "research-agent"
+    assert card["url"] == "http://research-agent.agents.svc.cluster.local:9000"
+    assert card["version"] == agent_config.DEFAULT_AGENT_VERSION
+    assert card["protocol_version"] == agent_config.A2A_PROTOCOL_VERSION
+    assert card["capabilities"] == {"streaming": False, "push_notifications": False}
+    assert card["default_input_modes"] == ["text/plain"]
+    assert [s["id"] for s in card["skills"]] == ["research"]
+
+
+def test_a2a_card_public_url_and_version_override(monkeypatch):
+    monkeypatch.setenv("AGENT_NAME", "specialist")
+    monkeypatch.setenv("A2A_PUBLIC_URL", "https://specialist.example.com/")  # trailing slash trimmed
+    monkeypatch.setenv("A2A_VERSION", "2.3.4")
+    card = agent_config.build_a2a_card({})
+    assert card["url"] == "https://specialist.example.com"
+    assert card["version"] == "2.3.4"
+
+
+def test_a2a_peers_from_config(write_config):
+    cfg = agent_config.load_operator_config(write_config(FULL_CONFIG))
+    peers = agent_config.build_peers(cfg)
+    # http peer kept (trailing path-less base url), grpc peer skipped
+    assert peers == {"summarizer": "http://summarizer.default.svc.cluster.local:8080"}
+    assert "legacy-grpc" not in peers
+
+
+def test_a2a_peers_from_env(monkeypatch):
+    monkeypatch.setenv(
+        "A2A_PEERS",
+        "http://summarizer.default.svc.cluster.local:8080/, grpc://nope:9000",
+    )
+    peers = agent_config.build_peers({})
+    # env-derived name comes from the URL host; non-http skipped; trailing / trimmed
+    assert peers == {"summarizer": "http://summarizer.default.svc.cluster.local:8080"}

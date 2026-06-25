@@ -17,8 +17,24 @@ auth:
   enabled: true
 
 # HTTP port the FastAPI server listens on (/health probe, / live UI, /events
-# SSE, /state, /resume, /restart).
+# SSE, /state, /resume, /restart). A2A (when enabled) shares this same port:
+# GET /.well-known/agent-card.json + JSON-RPC at POST /.
 port: 8080
+
+# A2A (Agent2Agent) is additive and off by default — set via the LanguageAgent's
+# env (operator-injected), not here. Reference:
+#   A2A_MODE=server   Request-driven: serve an Agent Card + JSON-RPC
+#                     (message/send, tasks/get) and DO NOT auto-run instructions.
+#                     Each request runs the agent on a fresh thread (HITL disabled).
+#   A2A_SKILLS        Comma-separated skill ids advertised on the card (server mode).
+#                     Richer skills (name/description/tags) come from a config.yaml
+#                     `a2a.skills:` block.
+#   A2A_PUBLIC_URL    Override the card's advertised url (default: the in-cluster
+#                     service address http://<name>.<ns>.svc.cluster.local:<port>).
+#   A2A_PEERS         Comma-separated peer base URLs. The autonomous agent gains a
+#                     `delegate_to_<peer>` tool per peer (alongside its MCP tools).
+#                     Peers may also come from a config.yaml `peers:` block.
+# With none of these set, behavior is unchanged (autonomous single run).
 
 resources:
   requests:

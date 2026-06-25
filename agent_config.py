@@ -37,6 +37,15 @@ GATEWAY_API_KEY = "sk-langop-proxy"
 # are not interrupted. See deepagents/middleware/filesystem.py.
 BUILTIN_WRITE_TOOLS = ("write_file", "edit_file")
 
+# A2A protocol version this runtime advertises on its Agent Card (implemented by
+# the bundled a2a-sdk). Carried on the card's JSON-RPC interface. "1.0" is the
+# SDK's native/current wire protocol (a2a.utils.constants.PROTOCOL_VERSION_CURRENT);
+# advertising it makes a2a-sdk clients speak v1 rather than the legacy v0.3 compat.
+A2A_PROTOCOL_VERSION = "1.0"
+
+# Card version (the agent's own version) when A2A_VERSION is unset.
+DEFAULT_AGENT_VERSION = "0.1.0"
+
 
 def load_operator_config(path: str = CONFIG_PATH) -> dict:
     """Parse ``/etc/agent/config.yaml``; return ``{}`` if absent or unreadable.
@@ -248,3 +257,134 @@ def workspace_root() -> str:
     otherwise the ``/workspace`` PVC.
     """
     return os.environ.get("AGENT_REPO_DIR") or "/workspace"
+
+
+# --------------------------------------------------------------------------- #
+# A2A (Agent2Agent) config translation
+#
+# Pure, dependency-free helpers — the actual ``a2a-sdk`` objects are assembled in
+# ``server.py`` from the plain dicts/maps these return (mirroring how
+# ``build_mcp_servers`` returns a dict consumed by ``MultiServerMCPClient``).
+# --------------------------------------------------------------------------- #
+def a2a_mode() -> str:
+    """A2A run mode from ``A2A_MODE`` (lower-cased, stripped).
+
+    ``"server"`` makes the runtime *request-driven*: it serves an Agent Card +
+    JSON-RPC and does **not** auto-run ``instructions``. Anything else
+    (default/unset) keeps today's autonomous single-run behavior.
+    """
+    return os.environ.get("A2A_MODE", "").strip().lower()
+
+
+def build_a2a_skills(cfg: dict) -> list:
+    """A2A skills advertised on the Agent Card.
+
+    From ``cfg["a2a"]["skills"]`` (a list of ``{id,name,description,tags}``) when
+    present, else the ``A2A_SKILLS`` env (comma-separated skill ids → minimal
+    skills with ``name == id``). Returns ``[]`` when neither is set.
+    """
+    cfg = cfg or {}
+    raw = (cfg.get("a2a") or {}).get("skills") or []
+    skills: list[dict] = []
+
+    if raw:
+        for entry in raw:
+            entry = entry or {}
+            sid = str(entry.get("id") or entry.get("name") or "").strip()
+            if not sid:
+                continue
+            tags = [str(t).strip() for t in (entry.get("tags") or []) if str(t).strip()]
+            skills.append(
+                {
+                    "id": sid,
+                    "name": str(entry.get("name") or sid).strip(),
+                    "description": str(entry.get("description") or "").strip(),
+                    "tags": tags,
+                }
+            )
+    else:
+        for sid in (s.strip() for s in os.environ.get("A2A_SKILLS", "").split(",")):
+            if not sid:
+                continue
+            skills.append({"id": sid, "name": sid, "description": "", "tags": []})
+
+    return skills
+
+
+def build_a2a_card(cfg: dict) -> dict:
+    """Assemble the Agent Card inputs (a plain dict; ``server.py`` builds the
+    ``a2a-sdk`` ``AgentCard`` from it).
+
+    ``name`` = ``AGENT_NAME`` env / ``cfg.agent.name``; ``url`` = ``A2A_PUBLIC_URL``
+    env, else the in-cluster service address
+    ``http://{name}.{namespace}.svc.cluster.local:{port}`` (``AGENT_NAMESPACE``
+    defaults ``default``, ``PORT`` defaults ``8080``); ``version`` = ``A2A_VERSION``
+    env else :data:`DEFAULT_AGENT_VERSION`. Capabilities are MVP-flat (no streaming,
+    no push). Always returns a valid minimal card.
+    """
+    cfg = cfg or {}
+    a2a = cfg.get("a2a") or {}
+    agent = cfg.get("agent") or {}
+
+    name = os.environ.get("AGENT_NAME") or agent.get("name") or "agent"
+    description = (
+        a2a.get("description")
+        or agent.get("description")
+        or f"Deepagents A2A agent {name}."
+    )
+
+    public = os.environ.get("A2A_PUBLIC_URL", "").strip()
+    if public:
+        url = public.rstrip("/")
+    else:
+        namespace = os.environ.get("AGENT_NAMESPACE") or agent.get("namespace") or "default"
+        port = os.environ.get("PORT", "8080").strip() or "8080"
+        url = f"http://{name}.{namespace}.svc.cluster.local:{port}"
+
+    version = os.environ.get("A2A_VERSION", "").strip() or DEFAULT_AGENT_VERSION
+
+    return {
+        "name": str(name),
+        "description": str(description).strip(),
+        "url": url,
+        "version": version,
+        "protocol_version": A2A_PROTOCOL_VERSION,
+        "capabilities": {"streaming": False, "push_notifications": False},
+        "default_input_modes": ["text/plain"],
+        "default_output_modes": ["text/plain"],
+        "skills": build_a2a_skills(cfg),
+    }
+
+
+def build_peers(cfg: dict) -> dict:
+    """Build the A2A peer map ``{name: base_url}`` for client-side delegation.
+
+    From ``cfg["peers"]`` — a map ``name -> {url|endpoint}`` or a list of base
+    URLs — else the comma-separated ``A2A_PEERS`` env. Non-``http(s)`` entries are
+    skipped (the same guard ``build_mcp_servers`` uses); env-derived names come
+    from the URL host via :func:`_name_from_url`.
+    """
+    cfg = cfg or {}
+    peers_cfg = cfg.get("peers")
+    out: dict[str, str] = {}
+
+    if peers_cfg:
+        items = peers_cfg.items() if isinstance(peers_cfg, dict) else enumerate(peers_cfg)
+        for key, val in items:
+            if isinstance(val, str):
+                url, declared = val, key if isinstance(key, str) else None
+            else:
+                val = val or {}
+                url = val.get("url") or val.get("endpoint") or ""
+                declared = val.get("name") or (key if isinstance(key, str) else None)
+            url = str(url).strip()
+            if not url.startswith(("http://", "https://")):
+                continue
+            out[str(declared or _name_from_url(url))] = url.rstrip("/")
+    else:
+        for url in (s.strip() for s in os.environ.get("A2A_PEERS", "").split(",")):
+            if not url or not url.startswith(("http://", "https://")):
+                continue
+            out[_name_from_url(url)] = url.rstrip("/")
+
+    return out

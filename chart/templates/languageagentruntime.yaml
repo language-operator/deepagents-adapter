@@ -62,6 +62,10 @@ spec:
         value: /workspace
       - name: PYTHONUNBUFFERED
         value: "1"
+      # A2A (Agent2Agent) is additive and off by default. The operator injects
+      # A2A_MODE / A2A_SKILLS / A2A_PEERS / A2A_PUBLIC_URL per LanguageAgent when
+      # configured (see values.yaml); unset = unchanged autonomous single run.
+      # A2A shares this server's port — no extra ports needed.
 
     resources:
       {{- toYaml .Values.resources | nindent 6 }}

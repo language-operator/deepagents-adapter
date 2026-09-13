@@ -6,5 +6,13 @@
 # Exit 0 = all pass.
 set -e
 cd /app
+
+# The operator authenticates these for spec.repository (GH_TOKEN / GITLAB_TOKEN);
+# the image must ship them, and the runtime user must be the operator's uid 1000.
+git --version >/dev/null
+gh --version >/dev/null
+glab --version >/dev/null
+[ "$(id -u app)" = "1000" ]
+
 uv sync --frozen --group dev
 exec uv run --no-sync pytest -q

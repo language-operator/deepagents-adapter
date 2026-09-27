@@ -6,17 +6,15 @@ operator-injected ``/etc/agent/config.yaml`` (via :mod:`agent_config`) and then
 streaming every event to STDOUT — so ``kubectl logs`` is a real UI — and to any
 connected browser. It runs the task once, then idles (staying Ready for probes).
 
-Human-in-the-loop is wired: ``create_deep_agent(interrupt_on=…)`` pauses before
-side-effecting tools. langgraph interrupts cannot be fire-and-forget — resuming
-needs an out-of-band channel — so the thin server exposes ``POST /resume`` (and the
-UI's Approve/Reject buttons) to continue a paused run, plus ``POST /restart``.
+There is no human-in-the-loop: the agent calls every tool (file writes, MCP tools,
+peer delegation) without asking for approval. Deploying this runtime means opting
+into an autonomous agent.
 
 Endpoints:
   GET  /health  — probe target.
   GET  /        — live UI (AGENT_NAME templated).
   GET  /events  — SSE: replays the run so far, then streams live events.
-  GET  /state   — current status + any pending HITL interrupt.
-  POST /resume  — {decisions:[…]} → continue a paused run.
+  GET  /state   — current status.
   POST /restart — cancel + re-run the task on a fresh thread.
 
 A2A (Agent2Agent) is additive (see :mod:`agent_config`):
@@ -40,12 +38,11 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 
 from agent_config import (
     a2a_mode,
     build_a2a_card,
-    build_interrupt_on,
     build_mcp_servers,
     build_model,
     build_peers,
@@ -64,7 +61,6 @@ except ImportError:  # pragma: no cover - resolved at image build time
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from langgraph.types import Command
 
 APP_DIR = Path(__file__).resolve().parent
 AGENT_NAME = os.environ.get("AGENT_NAME", "agent")
@@ -117,13 +113,11 @@ class Runner:
         self._agent = agent
         self._task = task
         self.thread_id = uuid.uuid4().hex
-        self.status = "idle"          # idle | running | interrupted | completed | error
+        self.status = "idle"          # idle | running | completed | error
         self.error: str | None = None
-        self.pending_interrupt: dict | None = None
         self.events: list[dict] = []
         self._seq = 0
         self._subscribers: set[asyncio.Queue] = set()
-        self._resume: asyncio.Future | None = None
         self._run_task: asyncio.Task | None = None
 
     # -- broadcast ---------------------------------------------------------
@@ -179,47 +173,18 @@ class Runner:
         self._set_status("running")
         agent_input = {"messages": [{"role": "user", "content": self._task}]}
         try:
-            while True:
-                async for item in self._agent.astream(
-                    agent_input, config=self._config(),
-                    stream_mode="messages", subgraphs=True,
-                ):
-                    ev = _normalize(item)
-                    if ev:
-                        self._publish(ev)
-
-                snapshot = await self._agent.aget_state(self._config())
-                if snapshot.interrupts:
-                    decisions = await self._await_decisions(snapshot.interrupts[0])
-                    agent_input = Command(resume={"decisions": decisions})
-                    continue
-                break
+            async for item in self._agent.astream(
+                agent_input, config=self._config(),
+                stream_mode="messages", subgraphs=True,
+            ):
+                ev = _normalize(item)
+                if ev:
+                    self._publish(ev)
             self._set_status("completed")
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # surface to logs + UI instead of dying silently
             self._set_status("error", str(exc))
-
-    async def _await_decisions(self, interrupt) -> list:
-        """Publish the HITL request and block until /resume supplies decisions."""
-        request = interrupt.value  # HITLRequest: {action_requests, review_configs}
-        self.pending_interrupt = {"id": interrupt.id, "request": request}
-        self._resume = asyncio.get_event_loop().create_future()
-        self._set_status("interrupted")
-        self._publish({"type": "interrupt", "id": interrupt.id, "request": request})
-        try:
-            decisions = await self._resume
-        finally:
-            self.pending_interrupt = None
-            self._resume = None
-        self._set_status("running")
-        return decisions
-
-    def resume(self, decisions: list) -> bool:
-        if self._resume is None or self._resume.done():
-            return False
-        self._resume.set_result(decisions)
-        return True
 
     async def restart(self) -> None:
         if self._run_task and not self._run_task.done():
@@ -229,8 +194,6 @@ class Runner:
             except asyncio.CancelledError:
                 pass
         self.thread_id = uuid.uuid4().hex
-        self.pending_interrupt = None
-        self._resume = None
         # Clear the replay buffer for fresh subscribers, but keep _seq monotonic so
         # connected clients don't mistake new events for already-seen ones.
         self.events = []
@@ -247,8 +210,7 @@ async def run_agent_once(agent, text: str) -> str:
     """Run the agent once on ``text`` (fresh thread) and return its final answer.
 
     Used by the A2A server executor: synchronous request/response, so it runs to
-    completion (``ainvoke``) and returns the last assistant message's text. The
-    server-mode agent is built with HITL disabled, so it never pauses mid-request.
+    completion (``ainvoke``) and returns the last assistant message's text.
     """
     config = {"configurable": {"thread_id": uuid.uuid4().hex}}
     result = await agent.ainvoke({"messages": [{"role": "user", "content": text}]}, config=config)
@@ -470,15 +432,11 @@ async def lifespan(app: FastAPI):
         # Peer-delegation tools sit alongside the MCP tools (A2A client side).
         tools += await build_peer_tools(cfg)
 
-    # In server mode each A2A request is synchronous with no human to resume, so
-    # HITL is disabled; otherwise pause before side-effecting tools as usual.
-    interrupt_on = {} if server_mode else build_interrupt_on(cfg, servers.keys())
-
     if model is None:
         print("deepagents-adapter: no model resolved — runtime will idle")
     else:
         print(f"deepagents-adapter: model={model.model_name} via {model.openai_api_base}")
-        print(f"deepagents-adapter: interrupt_on={list(interrupt_on)} task={'yes' if task else 'none'} a2a_mode={a2a_mode() or 'autonomous'}")
+        print(f"deepagents-adapter: task={'yes' if task else 'none'} a2a_mode={a2a_mode() or 'autonomous'}")
 
     ckpt_dir = os.path.join(root, ".deepagents")
     os.makedirs(ckpt_dir, exist_ok=True)
@@ -499,7 +457,6 @@ async def lifespan(app: FastAPI):
                 # IS its workspace.
                 backend=FilesystemBackend(root_dir=root, virtual_mode=True),
                 checkpointer=saver,
-                interrupt_on=interrupt_on,
             )
             print(f"deepagents-adapter: agent ready (workspace={root}, checkpoints={db_path})")
 
@@ -542,7 +499,6 @@ async def state(request: Request):
         "status": r.status,
         "thread_id": r.thread_id,
         "error": r.error,
-        "pending_interrupt": r.pending_interrupt,
     }
 
 
@@ -564,18 +520,6 @@ async def events(request: Request):
         media_type="text/event-stream",
         headers={"cache-control": "no-store", "x-accel-buffering": "no"},
     )
-
-
-@app.post("/resume")
-async def resume(request: Request):
-    r: Runner = request.app.state.runner
-    body = await request.json()
-    decisions = body.get("decisions")
-    if not isinstance(decisions, list):
-        return JSONResponse({"error": "decisions must be a list"}, status_code=400)
-    if not r.resume(decisions):
-        return JSONResponse({"error": "no pending interrupt"}, status_code=409)
-    return {"ok": True}
 
 
 @app.post("/restart")

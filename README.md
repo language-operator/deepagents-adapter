@@ -18,14 +18,13 @@ A **single combined image** plus a **Helm chart** that registers a
   once, streaming every event to **STDOUT** (so `kubectl logs` is the primary UI)
   and to a live browser view. Then it idles. **No init container** — unlike the
   CLI-wrapping runtimes, the server is our own code and reads the config directly.
-  - **Human-in-the-loop** is wired: `create_deep_agent(interrupt_on=…)` pauses
-    before side-effecting tools (`write_file`/`edit_file` and MCP tools by
-    default; override with `HITL_TOOLS`). The run resumes when approved.
+  - **No human-in-the-loop.** The agent calls every tool — file writes, MCP
+    tools, peer delegation — without asking for approval. Deploy this runtime
+    only where an autonomous agent acting on its own is what you want.
   - Endpoints (thin server): `GET /health` (probe), `GET /` (live UI),
-    `GET /events` (SSE: replay + live), `GET /state` (status + pending interrupt),
-    `POST /resume` (`{decisions:[…]}` — approve/reject), `POST /restart`.
+    `GET /events` (SSE: replay + live), `GET /state` (run status), `POST /restart`.
   - `agent_config.py` — the pure config-translation core (model selection, persona
-    system prompt, task/instructions, MCP server map, interrupt policy, A2A card /
+    system prompt, task/instructions, MCP server map, A2A card /
     skills / peer map, env-var fallbacks). This is what the tests target.
   - Session state persists across restarts via a LangGraph SQLite checkpointer on
     the `/workspace` PVC.
@@ -58,8 +57,7 @@ spec:
 ```
 
 The agent runs its `instructions` on startup. Watch it with `kubectl logs`, or
-`kubectl port-forward` and open `/` for the live view (streaming output, HITL
-Approve/Reject buttons, and Restart).
+`kubectl port-forward` and open `/` for the live view (streaming output and Restart).
 
 ## A2A (Agent2Agent)
 
@@ -77,8 +75,7 @@ it serves an Agent Card and answers JSON-RPC calls instead of auto-running
   version, capabilities, and `skills`).
 - JSON-RPC at `POST /` — `message/send` runs the agent on the incoming message
   (fresh thread per task) and returns a **completed Task** whose artifact is the
-  answer; `tasks/get` reads it back. Backed by an in-memory task store. HITL is
-  disabled in server mode (a synchronous request has no human to resume).
+  answer; `tasks/get` reads it back. Backed by an in-memory task store.
 - `A2A_SKILLS` — comma-separated skill ids to advertise (or a richer
   `a2a.skills:` block — `{id,name,description,tags}` — in `config.yaml`).
 - `A2A_PUBLIC_URL` — override the advertised `url` (default: the in-cluster service

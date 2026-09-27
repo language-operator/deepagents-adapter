@@ -25,7 +25,6 @@
       background: #30363d; color: #adbac7;
     }
     .badge.running { background: #1f6f3f; color: #aff5c8; }
-    .badge.interrupted { background: #7a5d00; color: #ffe08a; }
     .badge.completed { background: #1f4d7a; color: #add2ff; }
     .badge.error { background: #6e2330; color: #ffb3bd; }
     button {
@@ -34,8 +33,6 @@
       font-weight: 600; cursor: pointer;
     }
     button:hover { border-color: #8b949e; }
-    button.approve { background: #238636; border-color: #238636; color: #fff; }
-    button.reject { background: #6e2330; border-color: #6e2330; color: #fff; }
     button:disabled { opacity: .5; cursor: default; }
     #log { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
     .row { max-width: 860px; width: 100%; margin: 0 auto; }
@@ -44,20 +41,6 @@
     .tool-result { color: #6e7681; font-size: 12px; font-family: ui-monospace, monospace; white-space: pre-wrap; }
     .note { color: #7d8590; font-size: 12px; font-style: italic; }
     .err { color: #ff9492; white-space: pre-wrap; }
-    .approval {
-      max-width: 860px; width: 100%; margin: 4px auto; padding: 14px;
-      border: 1px solid #7a5d00; border-radius: 10px; background: #1a1700;
-    }
-    .approval h3 { margin: 0 0 8px; font-size: 14px; color: #ffe08a; }
-    .approval pre {
-      margin: 6px 0; padding: 8px; background: #0d1117; border-radius: 6px;
-      font-size: 12px; overflow-x: auto; color: #adbac7;
-    }
-    .approval .actions { display: flex; gap: 8px; margin-top: 10px; }
-    .approval input {
-      flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid #30363d;
-      background: #0d1117; color: #e6edf3; font: inherit; font-size: 13px;
-    }
   </style>
 </head>
 <body>
@@ -91,50 +74,6 @@
     }
     function note(text) { row('note', text); }
 
-    function renderInterrupt(ev) {
-      const req = ev.request || {};
-      const actions = req.action_requests || [];
-      const card = document.createElement('div');
-      card.className = 'approval';
-      const h = document.createElement('h3');
-      h.textContent = '⏸ Approval required';
-      card.append(h);
-      actions.forEach((a) => {
-        const p = document.createElement('pre');
-        p.textContent = a.name + '(' + JSON.stringify(a.args || {}, null, 2) + ')'
-          + (a.description ? '\n\n' + a.description : '');
-        card.append(p);
-      });
-      const wrap = document.createElement('div');
-      wrap.className = 'actions';
-      const msg = document.createElement('input');
-      msg.placeholder = 'optional reason (sent to the agent on reject)';
-      const approve = document.createElement('button');
-      approve.className = 'approve'; approve.textContent = 'Approve';
-      const reject = document.createElement('button');
-      reject.className = 'reject'; reject.textContent = 'Reject';
-      const decide = async (type) => {
-        approve.disabled = reject.disabled = true;
-        const decisions = actions.map(() =>
-          type === 'reject' && msg.value.trim()
-            ? { type: 'reject', message: msg.value.trim() }
-            : { type });
-        await fetch('/resume', {
-          method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ decisions }),
-        });
-        card.querySelector('.actions').replaceWith(
-          Object.assign(document.createElement('div'),
-            { className: 'note', textContent: type === 'approve' ? '✓ approved' : '✗ rejected' }));
-      };
-      approve.onclick = () => decide('approve');
-      reject.onclick = () => decide('reject');
-      wrap.append(approve, reject, msg);
-      card.append(wrap);
-      log.append(card);
-      log.scrollTop = log.scrollHeight;
-    }
-
     function handle(ev) {
       if (typeof ev.seq === 'number') { if (ev.seq <= seen) return; seen = ev.seq; }
       switch (ev.type) {
@@ -144,7 +83,6 @@
           current.textContent += ev.text; log.scrollTop = log.scrollHeight; break;
         case 'tool_call': current = null; row('tool', '⚙ ' + ev.name + '…'); break;
         case 'tool_result': current = null; row('tool-result', '↳ ' + (ev.name || 'tool') + (ev.text ? ': ' + ev.text : '')); break;
-        case 'interrupt': current = null; renderInterrupt(ev); break;
         case 'restart': current = null; log.innerHTML = ''; note('— restarted —'); break;
         case 'error': current = null; row('err', ev.error); break;
       }

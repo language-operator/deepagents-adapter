@@ -19,12 +19,12 @@ container** — the server is our own code and reads the config directly.
 ## Key files
 
 - `agent_config.py` — the pure config-translation core (model selection, persona
-  system prompt, task/instructions, MCP server map, interrupt/HITL policy, env-var
+  system prompt, task/instructions, MCP server map, A2A card/peers, env-var
   fallbacks). **This is what the tests target** — keep it pure and side-effect free.
 - `server.py` — thin FastAPI server: `GET /health` (probe), `GET /` (live UI),
-  `GET /events` (SSE replay + live), `GET /state`, `POST /resume`, `POST /restart`.
-  Human-in-the-loop pauses before side-effecting tools (`write_file`/`edit_file` and
-  MCP tools by default; override with `HITL_TOOLS`).
+  `GET /events` (SSE replay + live), `GET /state`, `POST /restart`.
+  No human-in-the-loop: the agent runs every tool without approval (deployers opt
+  into an autonomous agent).
 - `entrypoint.sh` / `Dockerfile` — container build; runtime venv is built `--no-dev`.
 - `tests/` — pytest suite over `agent_config.py`.
 - `chart/` — the `LanguageAgentRuntime` Helm chart (`Chart.yaml`, `values.yaml`).

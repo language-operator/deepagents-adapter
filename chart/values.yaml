@@ -17,7 +17,7 @@ auth:
   enabled: true
 
 # HTTP port the FastAPI server listens on (/health probe, / live UI, /events
-# SSE, /state, /resume, /restart). A2A (when enabled) shares this same port:
+# SSE, /state, /restart). A2A (when enabled) shares this same port:
 # GET /.well-known/agent-card.json + JSON-RPC at POST /.
 port: 8080
 
@@ -25,7 +25,7 @@ port: 8080
 # env (operator-injected), not here. Reference:
 #   A2A_MODE=server   Request-driven: serve an Agent Card + JSON-RPC
 #                     (message/send, tasks/get) and DO NOT auto-run instructions.
-#                     Each request runs the agent on a fresh thread (HITL disabled).
+#                     Each request runs the agent on a fresh thread.
 #   A2A_SKILLS        Comma-separated skill ids advertised on the card (server mode).
 #                     Richer skills (name/description/tags) come from a config.yaml
 #                     `a2a.skills:` block.

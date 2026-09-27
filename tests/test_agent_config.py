@@ -79,7 +79,6 @@ def clean_env(monkeypatch):
         "AGENT_INSTRUCTIONS",
         "AGENT_PERSONA",
         "AGENT_REPO_DIR",
-        "HITL_TOOLS",
         "A2A_MODE",
         "A2A_SKILLS",
         "A2A_PEERS",
@@ -125,14 +124,6 @@ def test_full_config_task_is_instructions(write_config):
     cfg = agent_config.load_operator_config(write_config(FULL_CONFIG))
     task = agent_config.build_task(cfg)
     assert task == "Research the topic and write a concise summary."
-
-
-def test_full_config_interrupt_on(write_config):
-    cfg = agent_config.load_operator_config(write_config(FULL_CONFIG))
-    servers = agent_config.build_mcp_servers(cfg)
-    interrupt_on = agent_config.build_interrupt_on(cfg, servers.keys())
-    # side-effecting builtins + the resolved MCP tool, all → True
-    assert interrupt_on == {"write_file": True, "edit_file": True, "context7": True}
 
 
 def test_full_config_mcp_servers(write_config):
@@ -239,24 +230,6 @@ def test_graceful_empty(tmp_path, monkeypatch):
     assert agent_config.a2a_mode() == ""
     assert agent_config.build_a2a_skills(cfg) == []
     assert agent_config.build_peers(cfg) == {}
-
-
-def test_interrupt_on_default_no_tools():
-    # no MCP tools → just the side-effecting builtins
-    assert agent_config.build_interrupt_on({}, []) == {"write_file": True, "edit_file": True}
-
-
-def test_interrupt_on_env_overrides(monkeypatch):
-    monkeypatch.setenv("HITL_TOOLS", "none")
-    assert agent_config.build_interrupt_on({}, ["context7"]) == {}
-    monkeypatch.setenv("HITL_TOOLS", "*")
-    assert agent_config.build_interrupt_on({}, ["context7"]) == {
-        "write_file": True,
-        "edit_file": True,
-        "context7": True,
-    }
-    monkeypatch.setenv("HITL_TOOLS", "context7")
-    assert agent_config.build_interrupt_on({}, ["context7"]) == {"context7": True}
 
 
 def test_workspace_root(monkeypatch):

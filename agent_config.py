@@ -32,11 +32,6 @@ CONFIG_PATH = "/etc/agent/config.yaml"
 # never see them. The OpenAI-compatible client still requires *some* api_key.
 GATEWAY_API_KEY = "sk-langop-proxy"
 
-# deepagents' built-in filesystem tools that mutate state. By default the agent
-# pauses (human-in-the-loop) before these; the read-only builtins (ls/read_file)
-# are not interrupted. See deepagents/middleware/filesystem.py.
-BUILTIN_WRITE_TOOLS = ("write_file", "edit_file")
-
 # A2A protocol version this runtime advertises on its Agent Card (implemented by
 # the bundled a2a-sdk). Carried on the card's JSON-RPC interface. "1.0" is the
 # SDK's native/current wire protocol (a2a.utils.constants.PROTOCOL_VERSION_CURRENT);
@@ -186,35 +181,6 @@ def build_task(cfg: dict) -> str:
     if not (instructions and str(instructions).strip()):
         instructions = os.environ.get("AGENT_INSTRUCTIONS", "")
     return str(instructions).strip() if instructions else ""
-
-
-def build_interrupt_on(cfg: dict, tool_names=None) -> dict:
-    """Build the ``create_deep_agent(interrupt_on=…)`` human-in-the-loop policy.
-
-    Maps tool name → ``True`` (all decisions — approve/edit/reject/respond —
-    allowed). Default policy pauses before *side-effecting* operations: the
-    built-in ``write_file``/``edit_file`` plus every resolved MCP tool (external
-    side effects). Read-only builtins (``ls``/``read_file``) are never paused.
-
-    Override with the ``HITL_TOOLS`` env var: ``"*"`` interrupts on every tool
-    (builtin writers + all MCP tools), a comma list names exactly which tools to
-    pause on, and ``"none"``/``""`` disables interrupts entirely.
-    """
-    tool_names = list(tool_names or [])
-    override = os.environ.get("HITL_TOOLS")
-
-    if override is not None:
-        value = override.strip()
-        if value in ("", "none"):
-            return {}
-        if value == "*":
-            names = list(BUILTIN_WRITE_TOOLS) + tool_names
-        else:
-            names = [n.strip() for n in value.split(",") if n.strip()]
-    else:
-        names = list(BUILTIN_WRITE_TOOLS) + tool_names
-
-    return {name: True for name in dict.fromkeys(names)}
 
 
 def _name_from_url(url: str) -> str:

@@ -6,3 +6,4 @@ __pycache__/
 *.tgz
 .DS_Store
 .claude/settings.json
+.claude/worktrees/

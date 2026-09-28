@@ -18,6 +18,9 @@ A **single combined image** plus a **Helm chart** that registers a
   once, streaming every event to **STDOUT** (so `kubectl logs` is the primary UI)
   and to a live browser view. Then it idles. **No init container** — unlike the
   CLI-wrapping runtimes, the server is our own code and reads the config directly.
+  - Built on [`coding-runtime`](https://github.com/language-operator/coding-runtime)'s
+    **thin** base: runs as uid 1000 under `tini`, with `git`, `gh` and `glab`
+    available to the agent (the operator exports `GH_TOKEN`/`GITLAB_TOKEN`).
   - **No human-in-the-loop.** The agent calls every tool — file writes, MCP
     tools, peer delegation — without asking for approval. Deploy this runtime
     only where an autonomous agent acting on its own is what you want.
@@ -98,7 +101,8 @@ With none of these set, behavior is unchanged (autonomous single run).
 | Target           | What it does                                                        |
 | ---------------- | ------------------------------------------------------------------- |
 | `make build`     | Build the image (`:<git-sha>` + `:latest`).                         |
-| `make test`      | Build, then run the pytest suite (`test.sh`) inside the image.      |
+| `make test`      | Run the pytest suite (`uv run pytest -q`).                          |
+| `make conformance` | Build, then run coding-runtime's conformance suite on the image.  |
 | `make publish`   | Build and push the image tags to ghcr.io.                           |
 | `make dev`       | Build, import into local k3s, and `helm upgrade` the runtime.       |
 | `make uninstall` | Uninstall the runtime release.                                      |
@@ -116,8 +120,8 @@ uv run pytest -q
 
 Three GitHub Actions workflows (`.github/workflows/`):
 
-- **test.yaml** — builds the image, runs `test.sh` (pytest), and `helm lint` /
-  `helm template` the chart.
+- **test.yaml** — runs pytest, builds the image and runs coding-runtime's conformance
+  suite against it (`adapter` mode), and `helm lint` / `helm template` the chart.
 - **build-image.yaml** — builds and pushes the image to `ghcr.io` with a
   `docker/metadata-action` tag matrix (on `main` and `v*` tags).
 - **release-chart.yaml** — `helm package` + `helm push` to

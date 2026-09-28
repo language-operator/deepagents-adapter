@@ -97,7 +97,8 @@ This skips issues labelled `in-progress` or `question`, then takes the first mat
 
 Mirror the PR CI jobs (`.github/workflows/test.yaml`):
 
-- Unit tests (`image-test`): `make test` builds the image and runs pytest inside it. For a quick local check, run `uv run pytest -q`.
+- Unit tests (`pytest`): `make test` (`uv run pytest -q`)
+- `Dockerfile` touched (`image-test`): `make conformance` builds the image and runs coding-runtime's conformance suite against it in `adapter` mode
 - `agent_config.py` behavior changed: add or extend tests under `tests/`
 - Chart touched (`chart-lint`): `helm lint chart && helm template deepagents chart >/dev/null`
 - The PR title must be a conventional commit (`feat:`, `fix:`, `chore:`, `docs:`, `test:`)

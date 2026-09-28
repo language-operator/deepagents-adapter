@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "codingRuntimeVersion": "0.0.0-test",
+    "runtimeName": "fixture",
+    "generatedAt": "2026-01-01T00:00:00.000Z",
+    "warnings": [
+      {
+        "code": "UNKNOWN_KEY",
+        "path": "a2a",
+        "message": "'a2a' is not emitted by language-operator and will be ignored"
+      },
+      {
+        "code": "UNKNOWN_KEY",
+        "path": "peers",
+        "message": "'peers' is not emitted by language-operator and will be ignored"
+      },
+      {
+        "code": "UNKNOWN_KEY",
+        "path": "agent.displayName",
+        "message": "'agent.displayName' is not emitted by language-operator and will be ignored"
+      },
+      {
+        "code": "UNKNOWN_KEY",
+        "path": "personas[0].displayName",
+        "message": "'personas[].displayName' is not emitted by language-operator (a persona is only name/tone/personality/expertise) and will be ignored"
+      },
+      {
+        "code": "UNKNOWN_KEY",
+        "path": "personas[0].description",
+        "message": "'personas[].description' is not emitted by language-operator (a persona is only name/tone/personality/expertise) and will be ignored"
+      },
+      {
+        "code": "UNKNOWN_KEY",
+        "path": "personas[0].systemPrompt",
+        "message": "'personas[].systemPrompt' is not emitted by language-operator (a persona is only name/tone/personality/expertise) and will be ignored"
+      },
+      {
+        "code": "UNKNOWN_KEY",
+        "path": "personas[0].instructions",
+        "message": "'personas[].instructions' is not emitted by language-operator (a persona is only name/tone/personality/expertise) and will be ignored"
+      },
+      {
+        "code": "UNKNOWN_KEY",
+        "path": "personas[0].capabilities",
+        "message": "'personas[].capabilities' is not emitted by language-operator (a persona is only name/tone/personality/expertise) and will be ignored"
+      },
+      {
+        "code": "UNKNOWN_KEY",
+        "path": "personas[0].limitations",
+        "message": "'personas[].limitations' is not emitted by language-operator (a persona is only name/tone/personality/expertise) and will be ignored"
+      },
+      {
+        "code": "UNKNOWN_KEY",
+        "path": "tools.my-tool.transport",
+        "message": "'tools.<name>.transport' is not emitted by language-operator and will be ignored"
+      }
+    ]
+  },
+  "agent": {
+    "name": "phantom",
+    "namespace": "default",
+    "uuid": null,
+    "clusterName": null,
+    "clusterUuid": null
+  },
+  "instructions": "Do the thing.",
+  "systemPrompt": "Tone: professional.",
+  "persona": {
+    "name": "p",
+    "tone": "professional",
+    "personality": null,
+    "expertise": null,
+    "text": "Tone: professional.",
+    "markdown": "# p\n\n**Tone:** professional\n"
+  },
+  "personas": [
+    {
+      "name": "p",
+      "tone": "professional",
+      "personality": null,
+      "expertise": null,
+      "text": "Tone: professional.",
+      "markdown": "# p\n\n**Tone:** professional\n"
+    }
+  ],
+  "gateway": null,
+  "models": {
+    "primary": null,
+    "ordered": [],
+    "byKey": {}
+  },
+  "tools": [
+    {
+      "name": "my-tool",
+      "endpoint": "http://my-tool.default.svc.cluster.local:8080/mcp",
+      "protocol": "mcp",
+      "transport": "streamable-http",
+      "local": false
+    }
+  ],
+  "paths": {
+    "workspace": "/workspace",
+    "repoDir": null,
+    "workDir": "/workspace",
+    "home": "/workspace/.home",
+    "stateDir": "/workspace/.coding-runtime",
+    "tmpDir": "/workspace/.tmp",
+    "cacheHome": "/workspace/.cache",
+    "dataHome": "/workspace/.local/share",
+    "configHome": "/workspace/.config",
+    "agentConfigPath": "/etc/agent/config.yaml"
+  }
+}

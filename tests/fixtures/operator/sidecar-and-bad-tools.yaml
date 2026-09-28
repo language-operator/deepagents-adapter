@@ -1,0 +1,18 @@
+# A sidecar-mode MCP tool resolves to localhost (mcpToolEndpoint in
+# utils_network.go), which harnesses need to distinguish from a cluster hop.
+# The grpc:// entry must be skipped with a warning, not crash the seed.
+agent: {name: toolbox, namespace: default}
+tools:
+  sidecar-tool:
+    endpoint: http://localhost:8080/mcp
+    protocol: mcp
+  service-tool:
+    endpoint: http://remote.tools.svc.cluster.local:8080/mcp
+    protocol: mcp
+  grpc-tool:
+    endpoint: grpc://not-http:9000
+    protocol: mcp
+  endpointless-tool:
+    protocol: mcp
+models:
+  m: {role: primary, model: claude-sonnet-4-5, endpoint: 'http://gateway.default.svc.cluster.local:8000'}

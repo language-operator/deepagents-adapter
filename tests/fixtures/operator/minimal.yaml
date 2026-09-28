@@ -1,0 +1,5 @@
+# What the operator writes for an agent with no instructions, no persona, no
+# tools and no models: the identity block and nothing else.
+agent:
+  name: bare
+  namespace: default

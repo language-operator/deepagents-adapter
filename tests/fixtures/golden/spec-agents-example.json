@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "codingRuntimeVersion": "0.0.0-test",
+    "runtimeName": "fixture",
+    "generatedAt": "2026-01-01T00:00:00.000Z",
+    "warnings": []
+  },
+  "agent": {
+    "name": "data-analyst",
+    "namespace": "default",
+    "uuid": null,
+    "clusterName": null,
+    "clusterUuid": null
+  },
+  "instructions": "You are a data analyst. Analyze CSV files and generate insights.\nFocus on trends, anomalies, and actionable recommendations.\nAlways cite data sources and use structured output.",
+  "systemPrompt": "Tone: professional.\nPersonality: Analytical and precise, always cites data sources and uses structured output.\nExpertise: Data analysis, statistical reasoning, and visualization.",
+  "persona": {
+    "name": "analytical-persona",
+    "tone": "professional",
+    "personality": "Analytical and precise, always cites data sources and uses structured output",
+    "expertise": "Data analysis, statistical reasoning, and visualization",
+    "text": "Tone: professional.\nPersonality: Analytical and precise, always cites data sources and uses structured output.\nExpertise: Data analysis, statistical reasoning, and visualization.",
+    "markdown": "# analytical-persona\n\n**Tone:** professional\n\n**Personality:** Analytical and precise, always cites data sources and uses structured output\n\n**Expertise:** Data analysis, statistical reasoning, and visualization\n"
+  },
+  "personas": [
+    {
+      "name": "analytical-persona",
+      "tone": "professional",
+      "personality": "Analytical and precise, always cites data sources and uses structured output",
+      "expertise": "Data analysis, statistical reasoning, and visualization",
+      "text": "Tone: professional.\nPersonality: Analytical and precise, always cites data sources and uses structured output.\nExpertise: Data analysis, statistical reasoning, and visualization.",
+      "markdown": "# analytical-persona\n\n**Tone:** professional\n\n**Personality:** Analytical and precise, always cites data sources and uses structured output\n\n**Expertise:** Data analysis, statistical reasoning, and visualization\n"
+    }
+  ],
+  "gateway": {
+    "baseUrl": "http://gateway.default.svc.cluster.local:8000",
+    "openaiBaseUrl": "http://gateway.default.svc.cluster.local:8000/v1",
+    "anthropicBaseUrl": "http://gateway.default.svc.cluster.local:8000",
+    "apiKey": "sk-langop-proxy",
+    "source": "config"
+  },
+  "models": {
+    "primary": {
+      "key": "claude-sonnet",
+      "role": "primary",
+      "provider": "anthropic",
+      "id": "claude-sonnet-4-5",
+      "endpoint": "http://gateway.default.svc.cluster.local:8000",
+      "priority": null
+    },
+    "ordered": [
+      {
+        "key": "claude-sonnet",
+        "role": "primary",
+        "provider": "anthropic",
+        "id": "claude-sonnet-4-5",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": null
+      }
+    ],
+    "byKey": {
+      "claude-sonnet": {
+        "key": "claude-sonnet",
+        "role": "primary",
+        "provider": "anthropic",
+        "id": "claude-sonnet-4-5",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": null
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "mem0-memory",
+      "endpoint": "http://mem0-memory.tools.svc.cluster.local:8080/mcp",
+      "protocol": "mcp",
+      "transport": "streamable-http",
+      "local": false
+    },
+    {
+      "name": "python-executor",
+      "endpoint": "http://python-executor.tools.svc.cluster.local:8080/mcp",
+      "protocol": "mcp",
+      "transport": "streamable-http",
+      "local": false
+    }
+  ],
+  "paths": {
+    "workspace": "/workspace",
+    "repoDir": "/workspace/analytics",
+    "workDir": "/workspace/analytics",
+    "home": "/workspace/.home",
+    "stateDir": "/workspace/.coding-runtime",
+    "tmpDir": "/workspace/.tmp",
+    "cacheHome": "/workspace/.cache",
+    "dataHome": "/workspace/.local/share",
+    "configHome": "/workspace/.config",
+    "agentConfigPath": "/etc/agent/config.yaml"
+  }
+}

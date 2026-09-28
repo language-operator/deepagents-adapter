@@ -1,0 +1,22 @@
+# `role: primary` deliberately declared after another model. claude-code's
+# seed-config takes the first mapping key and would pick `alpha`; deepagents'
+# agent_config honours the role and picks `omega`. The normalizer must pick
+# `omega`, and `beta` must sort ahead of `alpha` on priority.
+agent: {name: ordering, namespace: default}
+models:
+  alpha:
+    provider: openai
+    model: gpt-4o
+    endpoint: http://gateway.default.svc.cluster.local:8000
+    priority: 50
+  beta:
+    role: fallback
+    provider: openai
+    model: gpt-4o-mini
+    endpoint: http://gateway.default.svc.cluster.local:8000
+    priority: 10
+  omega:
+    role: primary
+    provider: anthropic
+    model: claude-sonnet-4-5
+    endpoint: http://gateway.default.svc.cluster.local:8000

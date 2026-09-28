@@ -1,0 +1,28 @@
+# Every key here that is not agent/instructions/personas/tools/models is read by
+# a shipping adapter but has never been emitted by the operator: openclaw reads
+# the six persona fields, deepagents reads a2a and peers. Normalizing must warn
+# on each and still succeed.
+agent:
+  name: phantom
+  namespace: default
+  displayName: Not A Real Field
+instructions: Do the thing.
+a2a:
+  description: not emitted
+  skills: []
+peers:
+  other-agent: http://other.default.svc.cluster.local:8080
+personas:
+  - name: p
+    displayName: Test Persona
+    description: A test persona.
+    systemPrompt: You are a test agent.
+    instructions: [Do the thing]
+    capabilities: [research]
+    limitations: [No speculation]
+    tone: professional
+tools:
+  my-tool:
+    endpoint: http://my-tool.default.svc.cluster.local:8080/mcp
+    protocol: mcp
+    transport: stdio

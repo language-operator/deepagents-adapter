@@ -57,7 +57,7 @@ spec:
       failureThreshold: 3
 
     env:
-      # The image sets WorkingDir=/app; redirect HOME to the writable PVC.
+      # The image sets WorkingDir=/app (read-only); redirect HOME to the writable PVC.
       - name: HOME
         value: /workspace
       - name: PYTHONUNBUFFERED

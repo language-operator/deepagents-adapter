@@ -21,6 +21,7 @@ pure translation logic can be exercised without the heavy dependency.
 from __future__ import annotations
 
 import os
+import re
 from urllib.parse import urlparse
 
 import yaml
@@ -189,13 +190,48 @@ def _name_from_url(url: str) -> str:
     return host.split(".")[0] or "mcp"
 
 
+# ``$(NAME)`` in a header value: an environment variable of the agent container,
+# the operator's reference syntax for spec.tools[].headers (language-operator#922).
+_ENV_REF = re.compile(r"\$\(([A-Za-z_][A-Za-z0-9_]*)\)")
+
+
+def resolve_headers(name: str, headers) -> dict:
+    """Resolve an external tool's ``headers`` against the environment.
+
+    deepagents has no env-reference syntax of its own, so ``$(NAME)`` is
+    substituted here, at startup, from ``os.environ``. A header whose variable
+    is unset (or empty) is dropped with a warning rather than sent as
+    ``$(NAME)`` literally, per the runtime contract. Non-mapping input and
+    non-scalar values are ignored.
+    """
+    if not isinstance(headers, dict):
+        return {}
+    out: dict[str, str] = {}
+    for header, raw in headers.items():
+        if raw is None or isinstance(raw, (dict, list)):
+            continue
+        value = str(raw)
+        missing = [ref for ref in _ENV_REF.findall(value) if not os.environ.get(ref)]
+        if missing:
+            print(
+                f"deepagents-adapter: tool '{name}' header '{header}' references unset "
+                f"environment variable(s) {', '.join(missing)}; not sent"
+            )
+            continue
+        out[header] = _ENV_REF.sub(lambda m: os.environ[m.group(1)], value)
+    return out
+
+
 def build_mcp_servers(cfg: dict) -> dict:
     """Build the ``MultiServerMCPClient`` config map from the tools section.
 
     Shape: ``{name: {"transport": "http", "url": endpoint}}`` (transport "http" =
     Streamable HTTP). Non-http endpoints are skipped, the same guard opencode
-    uses. Falls back to the comma-separated ``MCP_SERVERS`` env var (full MCP URLs
-    incl. ``/mcp``) when the config has no tools.
+    uses. An external tool's ``headers`` (``$(NAME)`` resolved from the
+    environment, see :func:`resolve_headers`) are passed as ``headers``, which
+    the http transport sends on every request. Falls back to the comma-separated
+    ``MCP_SERVERS`` env var (full MCP URLs incl. ``/mcp``) when the config has
+    no tools; that list never includes a server that needs headers.
     """
     cfg = cfg or {}
     tools = cfg.get("tools") or {}
@@ -206,7 +242,11 @@ def build_mcp_servers(cfg: dict) -> dict:
             endpoint = (tool or {}).get("endpoint")
             if not endpoint or not str(endpoint).startswith(("http://", "https://")):
                 continue
-            servers[name] = {"transport": "http", "url": endpoint}
+            entry: dict = {"transport": "http", "url": endpoint}
+            headers = resolve_headers(name, (tool or {}).get("headers"))
+            if headers:
+                entry["headers"] = headers
+            servers[name] = entry
     else:
         for url in (s.strip() for s in os.environ.get("MCP_SERVERS", "").split(",")):
             if not url or not url.startswith(("http://", "https://")):

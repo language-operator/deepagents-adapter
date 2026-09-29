@@ -327,3 +327,53 @@ def test_a2a_peers_from_env(monkeypatch):
     peers = agent_config.build_peers({})
     # env-derived name comes from the URL host; non-http skipped; trailing / trimmed
     assert peers == {"summarizer": "http://summarizer.default.svc.cluster.local:8080"}
+
+
+# --------------------------------------------------------------------------- #
+# External MCP servers with headers (language-operator#922)
+# --------------------------------------------------------------------------- #
+EXTERNAL_CONFIG = textwrap.dedent(
+    """
+    tools:
+      control-plane:
+        endpoint: https://cloud.example.com/mcp
+        protocol: mcp
+        headers:
+          Authorization: Bearer $(CONTROL_PLANE_TOKEN)
+          X-Agent: external
+          X-Optional: $(MISSING_TOKEN)
+      in-cluster:
+        endpoint: http://tool.default.svc.cluster.local:8080/mcp
+        protocol: mcp
+    """
+)
+
+
+def test_external_headers_resolved_from_env(write_config, monkeypatch, capsys):
+    monkeypatch.setenv("CONTROL_PLANE_TOKEN", "s3cret")
+    monkeypatch.delenv("MISSING_TOKEN", raising=False)
+    cfg = agent_config.load_operator_config(write_config(EXTERNAL_CONFIG))
+    servers = agent_config.build_mcp_servers(cfg)
+
+    assert servers["control-plane"] == {
+        "transport": "http",
+        "url": "https://cloud.example.com/mcp",
+        # $(NAME) substituted; the unset reference is dropped, never sent literally
+        "headers": {"Authorization": "Bearer s3cret", "X-Agent": "external"},
+    }
+    assert "headers" not in servers["in-cluster"]
+    out = capsys.readouterr().out
+    assert "X-Optional" in out and "MISSING_TOKEN" in out
+
+
+def test_resolve_headers_edge_cases(monkeypatch):
+    monkeypatch.setenv("A", "1")
+    monkeypatch.setenv("EMPTY", "")
+    assert agent_config.resolve_headers("t", None) == {}
+    assert agent_config.resolve_headers("t", ["not", "a", "map"]) == {}
+    assert agent_config.resolve_headers("t", {"Two": "$(A)/$(A)", "Nested": {"x": 1}, "Plain": 5}) == {
+        "Two": "1/1",
+        "Plain": "5",
+    }
+    # empty counts as unset; other dollar forms are not references
+    assert agent_config.resolve_headers("t", {"E": "$(EMPTY)", "Keep": "$A ${A} $(1x)"}) == {"Keep": "$A ${A} $(1x)"}

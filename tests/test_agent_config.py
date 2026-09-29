@@ -341,6 +341,11 @@ EXTERNAL_CONFIG = textwrap.dedent(
         headers:
           Authorization: Bearer $(CONTROL_PLANE_TOKEN)
           X-Agent: external
+      partial:
+        endpoint: https://other.example.com/mcp
+        protocol: mcp
+        headers:
+          Authorization: Bearer $(CONTROL_PLANE_TOKEN)
           X-Optional: $(MISSING_TOKEN)
       in-cluster:
         endpoint: http://tool.default.svc.cluster.local:8080/mcp
@@ -358,12 +363,15 @@ def test_external_headers_resolved_from_env(write_config, monkeypatch, capsys):
     assert servers["control-plane"] == {
         "transport": "http",
         "url": "https://cloud.example.com/mcp",
-        # $(NAME) substituted; the unset reference is dropped, never sent literally
         "headers": {"Authorization": "Bearer s3cret", "X-Agent": "external"},
     }
+    # A server with an unrenderable header is left out entirely rather than
+    # configured without auth to 401 unexplained; one warning names the header.
+    assert "partial" not in servers
     assert "headers" not in servers["in-cluster"]
     out = capsys.readouterr().out
-    assert "X-Optional" in out and "MISSING_TOKEN" in out
+    assert "partial" in out and "X-Optional ($(MISSING_TOKEN))" in out
+    assert "s3cret" not in out
 
 
 def test_resolve_headers_edge_cases(monkeypatch):
@@ -375,5 +383,10 @@ def test_resolve_headers_edge_cases(monkeypatch):
         "Two": "1/1",
         "Plain": "5",
     }
-    # empty counts as unset; other dollar forms are not references
-    assert agent_config.resolve_headers("t", {"E": "$(EMPTY)", "Keep": "$A ${A} $(1x)"}) == {"Keep": "$A ${A} $(1x)"}
+    # other dollar forms are not references
+    assert agent_config.resolve_headers("t", {"Keep": "$A ${A} $(1x)"}) == {"Keep": "$A ${A} $(1x)"}
+    # empty counts as unset, and one unset reference makes the whole set unrenderable
+    assert agent_config.resolve_headers("t", {"E": "$(EMPTY)", "Ok": "$(A)"}) is None
+    # a resolved secret is inserted verbatim, never reinterpreted as a replacement pattern
+    monkeypatch.setenv("S", r"\1 \g<0> $&")
+    assert agent_config.resolve_headers("t", {"A": "x$(S)y"}) == {"A": r"x\1 \g<0> $&y"}

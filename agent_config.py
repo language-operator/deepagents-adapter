@@ -195,30 +195,34 @@ def _name_from_url(url: str) -> str:
 _ENV_REF = re.compile(r"\$\(([A-Za-z_][A-Za-z0-9_]*)\)")
 
 
-def resolve_headers(name: str, headers) -> dict:
+def resolve_headers(name: str, headers) -> dict | None:
     """Resolve an external tool's ``headers`` against the environment.
 
     deepagents has no env-reference syntax of its own, so ``$(NAME)`` is
-    substituted here, at startup, from ``os.environ``. A header whose variable
-    is unset (or empty) is dropped with a warning rather than sent as
-    ``$(NAME)`` literally, per the runtime contract. Non-mapping input and
+    substituted here, at startup, from ``os.environ``. Rendering is
+    all-or-nothing: if any header references a variable that is unset or
+    empty, ``None`` is returned and one warning names the offenders, and the
+    caller must leave the server out. A server configured with some of its
+    headers missing looks healthy and fails with an unexplained 401 instead.
+    ``$(NAME)`` is never sent literally. Non-mapping input yields ``{}``;
     non-scalar values are ignored.
     """
     if not isinstance(headers, dict):
         return {}
     out: dict[str, str] = {}
+    unset: list[str] = []
     for header, raw in headers.items():
         if raw is None or isinstance(raw, (dict, list)):
             continue
         value = str(raw)
-        missing = [ref for ref in _ENV_REF.findall(value) if not os.environ.get(ref)]
-        if missing:
-            print(
-                f"deepagents-adapter: tool '{name}' header '{header}' references unset "
-                f"environment variable(s) {', '.join(missing)}; not sent"
-            )
-            continue
-        out[header] = _ENV_REF.sub(lambda m: os.environ[m.group(1)], value)
+        unset.extend(f"{header} ($({ref}))" for ref in _ENV_REF.findall(value) if not os.environ.get(ref))
+        out[header] = _ENV_REF.sub(lambda m: os.environ.get(m.group(1), ""), value)
+    if unset:
+        print(
+            f"deepagents-adapter: tool '{name}' header(s) {', '.join(unset)} reference unset "
+            "environment variable(s); the server is not configured"
+        )
+        return None
     return out
 
 
@@ -244,6 +248,8 @@ def build_mcp_servers(cfg: dict) -> dict:
                 continue
             entry: dict = {"transport": "http", "url": endpoint}
             headers = resolve_headers(name, (tool or {}).get("headers"))
+            if headers is None:
+                continue  # unrenderable: warned above, never configured without auth
             if headers:
                 entry["headers"] = headers
             servers[name] = entry

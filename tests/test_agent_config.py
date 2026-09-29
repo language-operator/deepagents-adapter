@@ -327,3 +327,66 @@ def test_a2a_peers_from_env(monkeypatch):
     peers = agent_config.build_peers({})
     # env-derived name comes from the URL host; non-http skipped; trailing / trimmed
     assert peers == {"summarizer": "http://summarizer.default.svc.cluster.local:8080"}
+
+
+# --------------------------------------------------------------------------- #
+# External MCP servers with headers (language-operator#922)
+# --------------------------------------------------------------------------- #
+EXTERNAL_CONFIG = textwrap.dedent(
+    """
+    tools:
+      control-plane:
+        endpoint: https://cloud.example.com/mcp
+        protocol: mcp
+        headers:
+          Authorization: Bearer $(CONTROL_PLANE_TOKEN)
+          X-Agent: external
+      partial:
+        endpoint: https://other.example.com/mcp
+        protocol: mcp
+        headers:
+          Authorization: Bearer $(CONTROL_PLANE_TOKEN)
+          X-Optional: $(MISSING_TOKEN)
+      in-cluster:
+        endpoint: http://tool.default.svc.cluster.local:8080/mcp
+        protocol: mcp
+    """
+)
+
+
+def test_external_headers_resolved_from_env(write_config, monkeypatch, capsys):
+    monkeypatch.setenv("CONTROL_PLANE_TOKEN", "s3cret")
+    monkeypatch.delenv("MISSING_TOKEN", raising=False)
+    cfg = agent_config.load_operator_config(write_config(EXTERNAL_CONFIG))
+    servers = agent_config.build_mcp_servers(cfg)
+
+    assert servers["control-plane"] == {
+        "transport": "http",
+        "url": "https://cloud.example.com/mcp",
+        "headers": {"Authorization": "Bearer s3cret", "X-Agent": "external"},
+    }
+    # A server with an unrenderable header is left out entirely rather than
+    # configured without auth to 401 unexplained; one warning names the header.
+    assert "partial" not in servers
+    assert "headers" not in servers["in-cluster"]
+    out = capsys.readouterr().out
+    assert "partial" in out and "X-Optional ($(MISSING_TOKEN))" in out
+    assert "s3cret" not in out
+
+
+def test_resolve_headers_edge_cases(monkeypatch):
+    monkeypatch.setenv("A", "1")
+    monkeypatch.setenv("EMPTY", "")
+    assert agent_config.resolve_headers("t", None) == {}
+    assert agent_config.resolve_headers("t", ["not", "a", "map"]) == {}
+    assert agent_config.resolve_headers("t", {"Two": "$(A)/$(A)", "Nested": {"x": 1}, "Plain": 5}) == {
+        "Two": "1/1",
+        "Plain": "5",
+    }
+    # other dollar forms are not references
+    assert agent_config.resolve_headers("t", {"Keep": "$A ${A} $(1x)"}) == {"Keep": "$A ${A} $(1x)"}
+    # empty counts as unset, and one unset reference makes the whole set unrenderable
+    assert agent_config.resolve_headers("t", {"E": "$(EMPTY)", "Ok": "$(A)"}) is None
+    # a resolved secret is inserted verbatim, never reinterpreted as a replacement pattern
+    monkeypatch.setenv("S", r"\1 \g<0> $&")
+    assert agent_config.resolve_headers("t", {"A": "x$(S)y"}) == {"A": r"x\1 \g<0> $&y"}

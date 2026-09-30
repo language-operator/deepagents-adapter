@@ -4,7 +4,7 @@
 # venv's interpreter references stay valid when copied across.
 # -----------------------------------------------------------------------------
 FROM python:3.13-slim AS build
-COPY --from=ghcr.io/astral-sh/uv:0.11.16 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.12.21 /uv /uvx /bin/
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
@@ -17,7 +17,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 # test.sh can sync the dev group and run pytest inside the image.
 # -----------------------------------------------------------------------------
 FROM python:3.13-slim
-COPY --from=ghcr.io/astral-sh/uv:0.11.16 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.12.21 /uv /uvx /bin/
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \

@@ -3,7 +3,7 @@
 # tini as PID 1, git/gh/glab/uv, and the in-image conformance suite. Pinned by
 # digest — never :latest or a main build.
 # -----------------------------------------------------------------------------
-ARG BASE=ghcr.io/language-operator/coding-runtime:0.1.1-python@sha256:83788b9c71ccc849d79b92cbd87dd65af21fdd2d26f831600bba656d0c6c0d4f
+ARG BASE=ghcr.io/language-operator/coding-runtime:0.1.4-python@sha256:3e95d047ad47e9677d35432e6ac29619ec0f4aac72cad50e95b06ca7f57c2960
 
 # -----------------------------------------------------------------------------
 # Builder stage: resolve the runtime venv with uv (no dev deps). Built FROM the

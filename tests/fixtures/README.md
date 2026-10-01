@@ -1,7 +1,7 @@
 # Operator fixture corpus
 
 Vendored from [`coding-runtime`](https://github.com/language-operator/coding-runtime)
-at **v0.1.1** — the same version as the `BASE` pinned in the `Dockerfile`:
+at **v0.1.4** — the same version as the `BASE` pinned in the `Dockerfile`:
 
 - `operator/` ← `test/fixtures/operator/` — configs as the operator writes them
   (`*.yaml`), plus env-only inputs (`*.env.json`).

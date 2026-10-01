@@ -56,8 +56,9 @@ container** — the server is our own code and reads the config directly.
 
 Cut a release with `/release major|minor|patch` (`.claude/commands/release.md`).
 Version is kept in **lockstep**: `chart/Chart.yaml` `version` + `appVersion`,
-`chart/values.yaml` `image.tag`, and the git tag `vX.Y.Z` all become the same
-`X.Y.Z`. Pushing a `v*` tag triggers `build-image.yaml` and `release-chart.yaml`.
+`chart/values.yaml` `image.tag`, `pyproject.toml` `version` (+ `uv.lock`), and the
+git tag `vX.Y.Z` all become the same `X.Y.Z`. `/release` also publishes GitHub
+release notes, breaking changes first. Pushing a `v*` tag triggers `build-image.yaml` and `release-chart.yaml`.
 
 ## Issue-driven workflow
 

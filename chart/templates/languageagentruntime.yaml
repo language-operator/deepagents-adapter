@@ -27,8 +27,8 @@ spec:
     imagePullPolicy: {{ .Values.image.pullPolicy }}
     {{- end }}
 
-    # We own the HTTP endpoint, so probe /health with httpGet (more precise than
-    # the tcpSocket probes the CLI-wrapping runtimes use). Readiness gating on
+    # We own the HTTP endpoint, so probe /health with httpGet (the CLI-wrapping
+    # runtimes probe /healthz and /readyz the same way). Readiness gating on
     # /health keeps the pod out of rotation until the agent is built.
     startupProbe:
       httpGet:

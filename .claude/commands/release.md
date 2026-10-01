@@ -1,7 +1,7 @@
 ---
 description: Cut a release — bump version in lockstep, tag, and push to trigger CI publish
 argument-hint: major|minor|patch
-allowed-tools: Bash(git:*), Bash(helm:*), Read, Edit
+allowed-tools: Bash(git:*), Bash(helm:*), Bash(uv:*), Bash(gh:*), Read, Edit
 ---
 
 Cut a new release of `deepagents-adapter`. The bump type is: **$ARGUMENTS**
@@ -13,7 +13,7 @@ A release is triggered by pushing a `vX.Y.Z` git tag. Two GitHub Actions workflo
 - `.github/workflows/build-image.yaml` — builds and pushes the adapter image to `ghcr.io/language-operator/deepagents-adapter`, tagged `X.Y.Z`, `X.Y`, `X`, and `sha-<commit>` (the leading `v` is stripped by `docker/metadata-action`).
 - `.github/workflows/release-chart.yaml` — runs `helm package chart` and pushes to `oci://ghcr.io/language-operator/charts`. The chart package version comes from `version:` in `chart/Chart.yaml`, **not** from the git tag.
 
-Version is kept in **lockstep**: `chart/Chart.yaml` `version`, `chart/Chart.yaml` `appVersion`, the pinned `image.tag` in `chart/values.yaml`, and the git tag all become the same `X.Y.Z`. This is a single combined image built by this repo (no split upstream/adapter tags).
+Version is kept in **lockstep**: `chart/Chart.yaml` `version`, `chart/Chart.yaml` `appVersion`, the pinned `image.tag` in `chart/values.yaml`, `pyproject.toml` `version` (mirrored into `uv.lock`'s `deepagents-adapter` entry), and the git tag all become the same `X.Y.Z`. This is a single combined image built by this repo (no split upstream/adapter tags).
 
 ## Steps
 
@@ -28,8 +28,8 @@ Perform these in order. If any precondition fails, stop and report the problem �
 
 **2. Determine the current (baseline) version.**
 - Latest tag: `git describe --tags --match 'v*' --abbrev=0` (may be empty if no tags exist yet — that's fine).
-- Read `version:` and `appVersion:` from `chart/Chart.yaml`.
-- Baseline = the **highest** semver among {latest tag with `v` stripped, chart `version`, `appVersion`}.
+- Read `version:` and `appVersion:` from `chart/Chart.yaml`, and `version =` from `pyproject.toml`.
+- Baseline = the **highest** semver among {latest tag with `v` stripped, chart `version`, `appVersion`, pyproject `version`}.
 
 **3. Compute the next version** from the bump type:
 - `patch` → `X.Y.(Z+1)`
@@ -41,11 +41,12 @@ Print: `Releasing vX.Y.Z (was <baseline>)`.
 **4. Edit version locations** (use the Edit tool):
 - `chart/Chart.yaml`: set `version: X.Y.Z` and `appVersion: "X.Y.Z"`.
 - `chart/values.yaml`: under `image:`, set `tag: X.Y.Z`. This is the combined adapter image built by this repo.
+- `pyproject.toml`: set `version = "X.Y.Z"`, then run `uv lock` so `uv.lock` records the same project version. It must change only the `deepagents-adapter` entry — if it upgrades any dependency, stop and report.
 
 **5. Validate the chart renders.** Run `helm lint chart` and `helm template chart >/dev/null`. If either fails, stop and report (the version is not yet committed, so nothing to roll back).
 
 **6. Commit and tag.**
-- `git commit -am "chore(release): vX.Y.Z"` — verify the diff contains only `chart/Chart.yaml` and `chart/values.yaml`.
+- `git commit -am "chore(release): vX.Y.Z"` — verify the diff contains only `chart/Chart.yaml`, `chart/values.yaml`, `pyproject.toml` and `uv.lock`.
 - `git tag -a vX.Y.Z -m "Release vX.Y.Z"`.
 
 **7. Confirm, then push.**
@@ -54,7 +55,13 @@ Print: `Releasing vX.Y.Z (was <baseline>)`.
 - On **yes**: `git push --follow-tags origin main` (pushes the commit and the new tag together).
 - On **no**: leave the commit and tag in place locally. Tell the user how to undo (`git tag -d vX.Y.Z` then `git reset --soft HEAD~1`) or push later (`git push --follow-tags origin main`).
 
-**8. Report.** After a successful push, report:
+**8. Publish release notes.** After a successful push, create the GitHub release for the tag:
+- Collect the changes: `git log --format='%h %s' <previous-tag>..vX.Y.Z`, skipping `chore(release)` commits.
+- Any commit whose subject has `!` before the colon (e.g. `feat!:`) or whose body has `BREAKING CHANGE:` is breaking. List those first, under **⚠ Breaking changes**, each with one line on what a deployer must do.
+- Then the remaining `feat`/`fix` commits, then everything else under **Other**.
+- `gh release create vX.Y.Z --title "vX.Y.Z" --notes-file <notes>` (write the notes to a file in the scratchpad, not the repo).
+
+**9. Report.** Report:
 - The pushed tag `vX.Y.Z`.
 - The two workflows now running (`Build and Push Image`, `Release Helm Chart`) — suggest watching them with `gh run watch` or the Actions tab.
 - The resulting artifacts: `ghcr.io/language-operator/deepagents-adapter:X.Y.Z` and `oci://ghcr.io/language-operator/charts/deepagents:X.Y.Z`.

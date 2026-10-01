@@ -18,7 +18,7 @@ auth:
 
 # HTTP port the FastAPI server listens on (/health probe, / live UI, /events
 # SSE, /state, /restart). A2A (when enabled) shares this same port:
-# GET /.well-known/agent-card.json + JSON-RPC at POST /.
+# GET /.well-known/agent-card.json + JSON-RPC at POST /. Injected as PORT.
 port: 8080
 
 # A2A (Agent2Agent) is additive and off by default — set via the LanguageAgent's

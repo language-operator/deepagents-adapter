@@ -58,6 +58,10 @@ Version is kept in **lockstep**: `chart/Chart.yaml` `version` + `appVersion`,
 
 ## Issue-driven workflow
 
-`/iterate [queue-number | #issue]` (`.claude/commands/iterate.md`) runs the full
-loop: pick an issue → worktree → plan → implement → test → PR → poll CI → squash-
-merge → close. Work happens inside a git worktree under `.claude/worktrees/`.
+`/iterate [#issue] [--auto]` (`.claude/commands/iterate.md`) handles **one issue**
+per run: pick the next issue (or `#issue`) → worktree → plan → implement → test →
+PR → poll CI → squash-merge → close, then stop. The plan pauses for approval, or is
+posted as an issue comment when `--auto` is passed or `AGENT_NAME` is set. Work
+happens inside a git worktree under `.claude/worktrees/`. The command body and the
+`iterate/*.sh` scripts are the org's canonical copy (language-operator#932) — only
+the frontmatter `allowed-tools` and the `## Testing` section are repo-specific.

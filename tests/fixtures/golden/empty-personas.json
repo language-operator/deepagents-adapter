@@ -22,6 +22,7 @@
     "openaiBaseUrl": "http://gateway.default.svc.cluster.local:8000/v1",
     "anthropicBaseUrl": "http://gateway.default.svc.cluster.local:8000",
     "apiKey": "sk-langop-proxy",
+    "apiKeyRef": null,
     "source": "config"
   },
   "models": {

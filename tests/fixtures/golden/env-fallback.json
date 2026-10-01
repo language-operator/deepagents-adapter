@@ -40,6 +40,7 @@
     "openaiBaseUrl": "http://gateway.default.svc.cluster.local:8000/v1",
     "anthropicBaseUrl": "http://gateway.default.svc.cluster.local:8000",
     "apiKey": "sk-langop-proxy",
+    "apiKeyRef": null,
     "source": "env"
   },
   "models": {
@@ -94,14 +95,16 @@
       "endpoint": "http://mem0.tools.svc.cluster.local:8080/mcp",
       "protocol": "mcp",
       "transport": "streamable-http",
-      "local": false
+      "local": false,
+      "headers": null
     },
     {
       "name": "localhost",
       "endpoint": "http://localhost:8080/mcp",
       "protocol": "mcp",
       "transport": "streamable-http",
-      "local": true
+      "local": true,
+      "headers": null
     }
   ],
   "paths": {

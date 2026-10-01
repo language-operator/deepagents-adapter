@@ -7,7 +7,7 @@
     "warnings": []
   },
   "agent": {
-    "name": "ordering",
+    "name": "external",
     "namespace": "default",
     "uuid": null,
     "clusterName": null,
@@ -27,67 +27,66 @@
   },
   "models": {
     "primary": {
-      "key": "omega",
+      "key": "m",
       "role": "primary",
-      "provider": "anthropic",
+      "provider": null,
       "id": "claude-sonnet-4-5",
       "endpoint": "http://gateway.default.svc.cluster.local:8000",
       "priority": null
     },
     "ordered": [
       {
-        "key": "omega",
+        "key": "m",
         "role": "primary",
-        "provider": "anthropic",
+        "provider": null,
         "id": "claude-sonnet-4-5",
         "endpoint": "http://gateway.default.svc.cluster.local:8000",
         "priority": null
-      },
-      {
-        "key": "beta",
-        "role": "fallback",
-        "provider": "openai",
-        "id": "gpt-4o-mini",
-        "endpoint": "http://gateway.default.svc.cluster.local:8000",
-        "priority": 10
-      },
-      {
-        "key": "alpha",
-        "role": null,
-        "provider": "openai",
-        "id": "gpt-4o",
-        "endpoint": "http://gateway.default.svc.cluster.local:8000",
-        "priority": 50
       }
     ],
     "byKey": {
-      "omega": {
-        "key": "omega",
+      "m": {
+        "key": "m",
         "role": "primary",
-        "provider": "anthropic",
+        "provider": null,
         "id": "claude-sonnet-4-5",
         "endpoint": "http://gateway.default.svc.cluster.local:8000",
         "priority": null
-      },
-      "beta": {
-        "key": "beta",
-        "role": "fallback",
-        "provider": "openai",
-        "id": "gpt-4o-mini",
-        "endpoint": "http://gateway.default.svc.cluster.local:8000",
-        "priority": 10
-      },
-      "alpha": {
-        "key": "alpha",
-        "role": null,
-        "provider": "openai",
-        "id": "gpt-4o",
-        "endpoint": "http://gateway.default.svc.cluster.local:8000",
-        "priority": 50
       }
     }
   },
-  "tools": [],
+  "tools": [
+    {
+      "name": "control-plane",
+      "endpoint": "https://cloud.example.com/mcp",
+      "protocol": "mcp",
+      "transport": "streamable-http",
+      "local": false,
+      "headers": {
+        "Authorization": "Bearer $(CONTROL_PLANE_TOKEN)",
+        "X-Agent": "external"
+      }
+    },
+    {
+      "name": "partial",
+      "endpoint": "https://other.example.com/mcp",
+      "protocol": "mcp",
+      "transport": "streamable-http",
+      "local": false,
+      "headers": {
+        "Authorization": "Bearer $(CONTROL_PLANE_TOKEN)",
+        "X-Optional": "$(MISSING_TOKEN)"
+      }
+    },
+    {
+      "name": "in-cluster",
+      "endpoint": "http://tool.default.svc.cluster.local:8080/mcp",
+      "protocol": "mcp",
+      "transport": "streamable-http",
+      "local": false,
+      "headers": null
+    }
+  ],
   "paths": {
     "workspace": "/workspace",
     "repoDir": null,

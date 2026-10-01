@@ -6,6 +6,7 @@ non-http tool skipping — plus the shared coding-runtime operator fixture corpu
 """
 
 import json
+import os
 import textwrap
 from pathlib import Path
 
@@ -441,7 +442,18 @@ def test_corpus_task(name, monkeypatch):
 @pytest.mark.parametrize("name", CORPUS)
 def test_corpus_mcp_servers(name, monkeypatch):
     cfg = _load_fixture(name, monkeypatch)
-    expected = {t["name"]: t["endpoint"] for t in _golden(name)["tools"]}
+    # The golden file is coding-runtime's *normalized* config, which keeps every
+    # tool. Like coding-runtime's emitters, we drop a tool whose headers reference
+    # an unset variable, so it is not expected here.
+    expected = {
+        t["name"]: t["endpoint"]
+        for t in _golden(name)["tools"]
+        if not any(
+            not os.environ.get(ref)
+            for value in (t.get("headers") or {}).values()
+            for ref in agent_config._ENV_REF.findall(value)
+        )
+    }
     servers = agent_config.build_mcp_servers(cfg)
     assert {k: v["url"] for k, v in servers.items()} == expected
 

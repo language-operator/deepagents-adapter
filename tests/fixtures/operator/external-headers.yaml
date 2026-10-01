@@ -1,0 +1,24 @@
+# External Streamable HTTP MCP servers (spec.tools[].url + headers,
+# language-operator#922) next to an in-cluster tool. `$(NAME)` refers to an
+# environment variable of the agent container; the env file sets
+# CONTROL_PLANE_TOKEN and leaves MISSING_TOKEN unset, so `control-plane` must
+# be rendered in full and `partial` left out of the client config entirely.
+agent: {name: external, namespace: default}
+tools:
+  control-plane:
+    endpoint: https://cloud.example.com/mcp
+    protocol: mcp
+    headers:
+      Authorization: Bearer $(CONTROL_PLANE_TOKEN)
+      X-Agent: external
+  partial:
+    endpoint: https://other.example.com/mcp
+    protocol: mcp
+    headers:
+      Authorization: Bearer $(CONTROL_PLANE_TOKEN)
+      X-Optional: $(MISSING_TOKEN)
+  in-cluster:
+    endpoint: http://tool.default.svc.cluster.local:8080/mcp
+    protocol: mcp
+models:
+  m: {role: primary, model: claude-sonnet-4-5, endpoint: 'http://gateway.default.svc.cluster.local:8000'}

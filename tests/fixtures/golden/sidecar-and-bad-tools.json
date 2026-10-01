@@ -33,6 +33,7 @@
     "openaiBaseUrl": "http://gateway.default.svc.cluster.local:8000/v1",
     "anthropicBaseUrl": "http://gateway.default.svc.cluster.local:8000",
     "apiKey": "sk-langop-proxy",
+    "apiKeyRef": null,
     "source": "config"
   },
   "models": {
@@ -71,14 +72,16 @@
       "endpoint": "http://localhost:8080/mcp",
       "protocol": "mcp",
       "transport": "streamable-http",
-      "local": true
+      "local": true,
+      "headers": null
     },
     {
       "name": "service-tool",
       "endpoint": "http://remote.tools.svc.cluster.local:8080/mcp",
       "protocol": "mcp",
       "transport": "streamable-http",
-      "local": false
+      "local": false,
+      "headers": null
     }
   ],
   "paths": {

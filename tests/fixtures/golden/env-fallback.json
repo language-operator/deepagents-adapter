@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "codingRuntimeVersion": "0.0.0-test",
+    "runtimeName": "fixture",
+    "generatedAt": "2026-01-01T00:00:00.000Z",
+    "warnings": [
+      {
+        "code": "CONFIG_ABSENT",
+        "path": "",
+        "message": "no agent config present; falling back to environment variables only"
+      },
+      {
+        "code": "TOOL_SKIPPED",
+        "path": "MCP_SERVERS",
+        "message": "'grpc://nope:1' is not an HTTP URL; skipping"
+      }
+    ]
+  },
+  "agent": {
+    "name": "env-agent",
+    "namespace": "default",
+    "uuid": "11111111-1111-1111-1111-111111111111",
+    "clusterName": "demo-cluster",
+    "clusterUuid": null
+  },
+  "instructions": "Do what the env says.",
+  "systemPrompt": "Tone: terse.\nPersonality: Direct.",
+  "persona": {
+    "name": null,
+    "tone": null,
+    "personality": null,
+    "expertise": null,
+    "text": "Tone: terse.\nPersonality: Direct.",
+    "markdown": null
+  },
+  "personas": [],
+  "gateway": {
+    "baseUrl": "http://gateway.default.svc.cluster.local:8000",
+    "openaiBaseUrl": "http://gateway.default.svc.cluster.local:8000/v1",
+    "anthropicBaseUrl": "http://gateway.default.svc.cluster.local:8000",
+    "apiKey": "sk-langop-proxy",
+    "source": "env"
+  },
+  "models": {
+    "primary": {
+      "key": "claude-sonnet-4-5",
+      "role": "primary",
+      "provider": null,
+      "id": "claude-sonnet-4-5",
+      "endpoint": "http://gateway.default.svc.cluster.local:8000",
+      "priority": null
+    },
+    "ordered": [
+      {
+        "key": "claude-sonnet-4-5",
+        "role": "primary",
+        "provider": null,
+        "id": "claude-sonnet-4-5",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": null
+      },
+      {
+        "key": "gpt-4o",
+        "role": null,
+        "provider": null,
+        "id": "gpt-4o",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": null
+      }
+    ],
+    "byKey": {
+      "claude-sonnet-4-5": {
+        "key": "claude-sonnet-4-5",
+        "role": "primary",
+        "provider": null,
+        "id": "claude-sonnet-4-5",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": null
+      },
+      "gpt-4o": {
+        "key": "gpt-4o",
+        "role": null,
+        "provider": null,
+        "id": "gpt-4o",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": null
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "mem0",
+      "endpoint": "http://mem0.tools.svc.cluster.local:8080/mcp",
+      "protocol": "mcp",
+      "transport": "streamable-http",
+      "local": false
+    },
+    {
+      "name": "localhost",
+      "endpoint": "http://localhost:8080/mcp",
+      "protocol": "mcp",
+      "transport": "streamable-http",
+      "local": true
+    }
+  ],
+  "paths": {
+    "workspace": "/workspace",
+    "repoDir": null,
+    "workDir": "/workspace",
+    "home": "/workspace/.home",
+    "stateDir": "/workspace/.coding-runtime",
+    "tmpDir": "/workspace/.tmp",
+    "cacheHome": "/workspace/.cache",
+    "dataHome": "/workspace/.local/share",
+    "configHome": "/workspace/.config",
+    "agentConfigPath": "/etc/agent/config.yaml"
+  }
+}

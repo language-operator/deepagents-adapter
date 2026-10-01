@@ -1,0 +1,6 @@
+# An explicitly empty personas list, alongside instructions with no identity.
+agent: {name: taskonly, namespace: default}
+instructions: Ship the thing.
+personas: []
+models:
+  only: {role: primary, model: claude-sonnet-4-5, endpoint: 'http://gateway.default.svc.cluster.local:8000'}

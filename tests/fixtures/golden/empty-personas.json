@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "codingRuntimeVersion": "0.0.0-test",
+    "runtimeName": "fixture",
+    "generatedAt": "2026-01-01T00:00:00.000Z",
+    "warnings": []
+  },
+  "agent": {
+    "name": "taskonly",
+    "namespace": "default",
+    "uuid": null,
+    "clusterName": null,
+    "clusterUuid": null
+  },
+  "instructions": "Ship the thing.",
+  "systemPrompt": null,
+  "persona": null,
+  "personas": [],
+  "gateway": {
+    "baseUrl": "http://gateway.default.svc.cluster.local:8000",
+    "openaiBaseUrl": "http://gateway.default.svc.cluster.local:8000/v1",
+    "anthropicBaseUrl": "http://gateway.default.svc.cluster.local:8000",
+    "apiKey": "sk-langop-proxy",
+    "source": "config"
+  },
+  "models": {
+    "primary": {
+      "key": "only",
+      "role": "primary",
+      "provider": null,
+      "id": "claude-sonnet-4-5",
+      "endpoint": "http://gateway.default.svc.cluster.local:8000",
+      "priority": null
+    },
+    "ordered": [
+      {
+        "key": "only",
+        "role": "primary",
+        "provider": null,
+        "id": "claude-sonnet-4-5",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": null
+      }
+    ],
+    "byKey": {
+      "only": {
+        "key": "only",
+        "role": "primary",
+        "provider": null,
+        "id": "claude-sonnet-4-5",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": null
+      }
+    }
+  },
+  "tools": [],
+  "paths": {
+    "workspace": "/workspace",
+    "repoDir": null,
+    "workDir": "/workspace",
+    "home": "/workspace/.home",
+    "stateDir": "/workspace/.coding-runtime",
+    "tmpDir": "/workspace/.tmp",
+    "cacheHome": "/workspace/.cache",
+    "dataHome": "/workspace/.local/share",
+    "configHome": "/workspace/.config",
+    "agentConfigPath": "/etc/agent/config.yaml"
+  }
+}

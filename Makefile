@@ -7,7 +7,7 @@ TAG       ?= $(GIT_SHA)
 NAMESPACE ?= language-operator
 RELEASE   ?= deepagents
 
-.PHONY: build publish test dev uninstall help
+.PHONY: build publish test conformance dev uninstall help
 
 build:
 	docker build -t $(IMAGE):$(TAG) -t $(IMAGE):latest .
@@ -16,10 +16,17 @@ publish: build
 	docker push $(IMAGE):$(TAG)
 	docker push $(IMAGE):latest
 
-# Run the pytest suite inside the image. --user root so uv can sync the dev group
-# into /app/.venv (built --no-dev for the runtime).
-test: build
-	docker run --rm --user root --entrypoint sh $(IMAGE):$(TAG) /app/test.sh
+# Run the pytest suite (agent_config.py) against the local venv.
+test:
+	uv run pytest -q
+
+# Run coding-runtime's conformance suite against the built image. The suite
+# ships inside the base image, so it always matches the base this was built on.
+conformance: build
+	docker run --rm --entrypoint cat $(IMAGE):$(TAG) \
+		/opt/coding-runtime/test/conformance.sh > .conformance.sh
+	chmod +x .conformance.sh
+	./.conformance.sh $(IMAGE):$(TAG) adapter; rc=$$?; rm -f .conformance.sh; exit $$rc
 
 # Build, load the adapter image into k3s, and upgrade the runtime release
 # referencing the freshly built image (development inner loop).
@@ -50,7 +57,8 @@ uninstall:
 help:
 	@echo "Targets:"
 	@echo "  build      - Build the adapter image ($(IMAGE):$(TAG) + :latest)"
-	@echo "  test       - Build, then run test.sh (pytest) inside the image"
+	@echo "  test       - Run the pytest suite (uv run pytest -q)"
+	@echo "  conformance - Build, then run the coding-runtime conformance suite"
 	@echo "  publish    - Build and push $(TAG) + latest to the registry"
 	@echo "  dev        - Build, import into k3s, and upgrade the runtime release (inner loop)"
 	@echo "  uninstall  - Uninstall the runtime release"

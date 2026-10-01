@@ -25,20 +25,23 @@ container** — the server is our own code and reads the config directly.
   `GET /events` (SSE replay + live), `GET /state`, `POST /restart`.
   No human-in-the-loop: the agent runs every tool without approval (deployers opt
   into an autonomous agent).
-- `entrypoint.sh` / `Dockerfile` — container build; runtime venv is built `--no-dev`.
-- `tests/` — pytest suite over `agent_config.py`.
+- `entrypoint.sh` / `Dockerfile` — container build on `coding-runtime`'s **thin** base
+  (`ARG BASE`, pinned by digest): uid 1000 `agent`, `tini` ENTRYPOINT, git/gh/glab/uv.
+  **Never create a user or override ENTRYPOINT** (the server runs as `CMD`). Runtime
+  venv is built `--no-dev`.
+- `tests/` — pytest suite over `agent_config.py`, including the vendored coding-runtime
+  operator fixture corpus (`tests/fixtures/`, re-sync on base bumps).
 - `chart/` — the `LanguageAgentRuntime` Helm chart (`Chart.yaml`, `values.yaml`).
 - `.github/workflows/` — `test.yaml`, `build-image.yaml`, `release-chart.yaml`.
 
 ## Testing
 
-- `make test` — builds the image and runs `test.sh` (pytest) inside it with
-  `--user root` (the runtime venv is `--no-dev`, so `test.sh` runs
-  `uv sync --frozen --group dev` first).
-- `uv run pytest -q` — run the suite directly against the local venv.
+- `make test` / `uv run pytest -q` — run the pytest suite against the local venv.
+- `make conformance` — build the image and run coding-runtime's conformance suite
+  (extracted from the image) in `adapter` mode, under the real pod posture.
 - Add/extend tests under `tests/` whenever `agent_config.py` behavior changes.
-- **No Python linter** is configured. CI correctness == the two `test.yaml` jobs:
-  `image-test` (pytest in Docker) and `chart-lint` (`helm lint chart` +
+- **No Python linter** is configured. CI correctness == the three `test.yaml` jobs:
+  `pytest`, `image-test` (conformance suite against the built image) and `chart-lint` (`helm lint chart` +
   `helm template deepagents chart`).
 
 ## Build & dev deploy

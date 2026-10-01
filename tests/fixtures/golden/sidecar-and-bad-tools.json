@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "codingRuntimeVersion": "0.0.0-test",
+    "runtimeName": "fixture",
+    "generatedAt": "2026-01-01T00:00:00.000Z",
+    "warnings": [
+      {
+        "code": "TOOL_SKIPPED",
+        "path": "tools.grpc-tool",
+        "message": "tool 'grpc-tool' endpoint 'grpc://not-http:9000' is not an HTTP URL; skipping"
+      },
+      {
+        "code": "TOOL_SKIPPED",
+        "path": "tools.endpointless-tool",
+        "message": "tool 'endpointless-tool' has no endpoint; skipping"
+      }
+    ]
+  },
+  "agent": {
+    "name": "toolbox",
+    "namespace": "default",
+    "uuid": null,
+    "clusterName": null,
+    "clusterUuid": null
+  },
+  "instructions": null,
+  "systemPrompt": null,
+  "persona": null,
+  "personas": [],
+  "gateway": {
+    "baseUrl": "http://gateway.default.svc.cluster.local:8000",
+    "openaiBaseUrl": "http://gateway.default.svc.cluster.local:8000/v1",
+    "anthropicBaseUrl": "http://gateway.default.svc.cluster.local:8000",
+    "apiKey": "sk-langop-proxy",
+    "source": "config"
+  },
+  "models": {
+    "primary": {
+      "key": "m",
+      "role": "primary",
+      "provider": null,
+      "id": "claude-sonnet-4-5",
+      "endpoint": "http://gateway.default.svc.cluster.local:8000",
+      "priority": null
+    },
+    "ordered": [
+      {
+        "key": "m",
+        "role": "primary",
+        "provider": null,
+        "id": "claude-sonnet-4-5",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": null
+      }
+    ],
+    "byKey": {
+      "m": {
+        "key": "m",
+        "role": "primary",
+        "provider": null,
+        "id": "claude-sonnet-4-5",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": null
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "sidecar-tool",
+      "endpoint": "http://localhost:8080/mcp",
+      "protocol": "mcp",
+      "transport": "streamable-http",
+      "local": true
+    },
+    {
+      "name": "service-tool",
+      "endpoint": "http://remote.tools.svc.cluster.local:8080/mcp",
+      "protocol": "mcp",
+      "transport": "streamable-http",
+      "local": false
+    }
+  ],
+  "paths": {
+    "workspace": "/workspace",
+    "repoDir": null,
+    "workDir": "/workspace",
+    "home": "/workspace/.home",
+    "stateDir": "/workspace/.coding-runtime",
+    "tmpDir": "/workspace/.tmp",
+    "cacheHome": "/workspace/.cache",
+    "dataHome": "/workspace/.local/share",
+    "configHome": "/workspace/.config",
+    "agentConfigPath": "/etc/agent/config.yaml"
+  }
+}

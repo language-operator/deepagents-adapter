@@ -2,10 +2,12 @@
 
 Covers the same ground opencode-adapter's test.sh covers for seed-config: full
 config mapping, env-var fallbacks, graceful-empty, primary-model selection, and
-non-http tool skipping.
+non-http tool skipping — plus the shared coding-runtime operator fixture corpus.
 """
 
+import json
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -390,3 +392,65 @@ def test_resolve_headers_edge_cases(monkeypatch):
     # a resolved secret is inserted verbatim, never reinterpreted as a replacement pattern
     monkeypatch.setenv("S", r"\1 \g<0> $&")
     assert agent_config.resolve_headers("t", {"A": "x$(S)y"}) == {"A": r"x\1 \g<0> $&y"}
+
+
+# --------------------------------------------------------------------------- #
+# Shared operator fixture corpus (coding-runtime test/fixtures, vendored under
+# tests/fixtures — see tests/fixtures/README.md). Each operator config is checked
+# against the fields of coding-runtime's normalized golden that map onto
+# agent_config, so both implementations are held to the same operator contract.
+# --------------------------------------------------------------------------- #
+FIXTURES = Path(__file__).parent / "fixtures"
+CORPUS = sorted(p.stem for p in (FIXTURES / "golden").glob("*.json"))
+
+
+def _load_fixture(name, monkeypatch):
+    """Apply a fixture's env and return its parsed config ({} when env-only)."""
+    env = FIXTURES / "operator" / f"{name}.env.json"
+    if env.exists():
+        for key, value in json.loads(env.read_text()).items():
+            monkeypatch.setenv(key, value)
+    config = FIXTURES / "operator" / f"{name}.yaml"
+    return agent_config.load_operator_config(str(config)) if config.exists() else {}
+
+
+def _golden(name):
+    return json.loads((FIXTURES / "golden" / f"{name}.json").read_text())
+
+
+@pytest.mark.parametrize("name", CORPUS)
+def test_corpus_primary_model(name, monkeypatch):
+    cfg = _load_fixture(name, monkeypatch)
+    golden = _golden(name)
+    primary = golden["models"]["primary"]
+    params = agent_config.resolve_model(cfg)
+    if primary is None or golden["gateway"] is None:
+        assert params is None
+        return
+    assert params["name"] == primary["id"]
+    assert params["base_url"] == golden["gateway"]["openaiBaseUrl"]
+    assert params["api_key"] == golden["gateway"]["apiKey"]
+
+
+@pytest.mark.parametrize("name", CORPUS)
+def test_corpus_task(name, monkeypatch):
+    cfg = _load_fixture(name, monkeypatch)
+    assert agent_config.build_task(cfg) == (_golden(name)["instructions"] or "")
+
+
+@pytest.mark.parametrize("name", CORPUS)
+def test_corpus_mcp_servers(name, monkeypatch):
+    cfg = _load_fixture(name, monkeypatch)
+    expected = {t["name"]: t["endpoint"] for t in _golden(name)["tools"]}
+    servers = agent_config.build_mcp_servers(cfg)
+    assert {k: v["url"] for k, v in servers.items()} == expected
+
+
+def test_corpus_phantom_fields_still_read(monkeypatch):
+    # The operator has never emitted `a2a` or `peers` (agentConfigYAML is only
+    # agent/instructions/personas/tools/models); the A2A_* env vars are the real
+    # path. agent_config still honours the keys when present.
+    cfg = _load_fixture("phantom-fields", monkeypatch)
+    assert agent_config.build_peers(cfg) == {
+        "other-agent": "http://other.default.svc.cluster.local:8080"
+    }

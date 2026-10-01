@@ -1,10 +1,17 @@
 # -----------------------------------------------------------------------------
-# Builder stage: resolve the runtime venv with uv (no dev deps), then discard the
-# build context. Builder and runtime share the same python:3.13-slim base so the
-# venv's interpreter references stay valid when copied across.
+# Built on coding-runtime's thin variant: uid 1000 (`agent`) with a passwd entry,
+# tini as PID 1, git/gh/glab/uv, and the in-image conformance suite. Pinned by
+# digest — never :latest or a main build.
 # -----------------------------------------------------------------------------
-FROM python:3.13-slim AS build
-COPY --from=ghcr.io/astral-sh/uv:0.12.21 /uv /uvx /bin/
+ARG BASE=ghcr.io/language-operator/coding-runtime:0.1.1-python@sha256:83788b9c71ccc849d79b92cbd87dd65af21fdd2d26f831600bba656d0c6c0d4f
+
+# -----------------------------------------------------------------------------
+# Builder stage: resolve the runtime venv with uv (no dev deps). Built FROM the
+# same base as the runtime so the venv's interpreter references stay valid when
+# copied across.
+# -----------------------------------------------------------------------------
+FROM ${BASE} AS build
+USER root
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
@@ -12,41 +19,25 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 # -----------------------------------------------------------------------------
-# Runtime stage. This is a service (FastAPI + deepagents), not a TUI image — OS
-# tooling stays minimal: ca-certificates, curl (HEALTHCHECK), git. uv is kept so
-# test.sh can sync the dev group and run pytest inside the image.
+# Runtime stage. The base already runs as uid 1000 and owns /workspace (the
+# operator-provisioned PVC, where the SQLite checkpointer and FilesystemBackend
+# write). Do not create a user — a second one at another uid is exactly the
+# failure this base exists to prevent.
 # -----------------------------------------------------------------------------
-FROM python:3.13-slim
-COPY --from=ghcr.io/astral-sh/uv:0.12.21 /uv /uvx /bin/
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        curl \
-        git \
-    && rm -rf /var/lib/apt/lists/*
-
+FROM ${BASE}
 WORKDIR /app
 
 # Runtime virtualenv (no dev deps) from the builder.
 COPY --from=build /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1 \
     PORT=8080
 
-# Application code + project metadata. pyproject.toml/uv.lock and tests/ power the
-# in-image pytest run (test.sh); they are inert at runtime.
-COPY agent_config.py server.py index.html pyproject.toml uv.lock ./
-COPY tests ./tests
+COPY agent_config.py server.py index.html ./
 COPY --chmod=755 entrypoint.sh /entrypoint.sh
-COPY --chmod=755 test.sh /app/test.sh
-
-# Non-root runtime user. /workspace is the operator-provisioned PVC mount — the
-# SQLite checkpointer and FilesystemBackend write there.
-RUN useradd --create-home --uid 10001 app \
-    && mkdir -p /workspace \
-    && chown -R app:app /workspace /app
-USER app
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
     CMD curl -fsS "http://127.0.0.1:${PORT:-8080}/health" >/dev/null || exit 1
 
-ENTRYPOINT ["/entrypoint.sh"]
+# Keep the base ENTRYPOINT (tini) so orphans are reaped and SIGTERM propagates;
+# the server runs as its CMD.
+CMD ["/entrypoint.sh"]

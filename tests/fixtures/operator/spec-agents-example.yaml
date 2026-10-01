@@ -1,0 +1,28 @@
+# The literal example from language-operator/spec/agents.md ("File Formats").
+# If the operator's documented contract ever stops normalizing cleanly, that is
+# a contract change we need to hear about — see the schema-drift canary in CI.
+agent:
+  name: data-analyst
+  namespace: default
+instructions: |
+  You are a data analyst. Analyze CSV files and generate insights.
+  Focus on trends, anomalies, and actionable recommendations.
+  Always cite data sources and use structured output.
+personas:
+  - name: analytical-persona
+    tone: professional
+    personality: Analytical and precise, always cites data sources and uses structured output
+    expertise: Data analysis, statistical reasoning, and visualization
+tools:
+  mem0-memory:
+    endpoint: http://mem0-memory.tools.svc.cluster.local:8080/mcp
+    protocol: mcp
+  python-executor:
+    endpoint: http://python-executor.tools.svc.cluster.local:8080/mcp
+    protocol: mcp
+models:
+  claude-sonnet:
+    role: primary
+    provider: anthropic
+    model: claude-sonnet-4-5
+    endpoint: http://gateway.default.svc.cluster.local:8000

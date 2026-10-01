@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "codingRuntimeVersion": "0.0.0-test",
+    "runtimeName": "fixture",
+    "generatedAt": "2026-01-01T00:00:00.000Z",
+    "warnings": []
+  },
+  "agent": {
+    "name": "ordering",
+    "namespace": "default",
+    "uuid": null,
+    "clusterName": null,
+    "clusterUuid": null
+  },
+  "instructions": null,
+  "systemPrompt": null,
+  "persona": null,
+  "personas": [],
+  "gateway": {
+    "baseUrl": "http://gateway.default.svc.cluster.local:8000",
+    "openaiBaseUrl": "http://gateway.default.svc.cluster.local:8000/v1",
+    "anthropicBaseUrl": "http://gateway.default.svc.cluster.local:8000",
+    "apiKey": "sk-langop-proxy",
+    "source": "config"
+  },
+  "models": {
+    "primary": {
+      "key": "omega",
+      "role": "primary",
+      "provider": "anthropic",
+      "id": "claude-sonnet-4-5",
+      "endpoint": "http://gateway.default.svc.cluster.local:8000",
+      "priority": null
+    },
+    "ordered": [
+      {
+        "key": "omega",
+        "role": "primary",
+        "provider": "anthropic",
+        "id": "claude-sonnet-4-5",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": null
+      },
+      {
+        "key": "beta",
+        "role": "fallback",
+        "provider": "openai",
+        "id": "gpt-4o-mini",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": 10
+      },
+      {
+        "key": "alpha",
+        "role": null,
+        "provider": "openai",
+        "id": "gpt-4o",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": 50
+      }
+    ],
+    "byKey": {
+      "omega": {
+        "key": "omega",
+        "role": "primary",
+        "provider": "anthropic",
+        "id": "claude-sonnet-4-5",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": null
+      },
+      "beta": {
+        "key": "beta",
+        "role": "fallback",
+        "provider": "openai",
+        "id": "gpt-4o-mini",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": 10
+      },
+      "alpha": {
+        "key": "alpha",
+        "role": null,
+        "provider": "openai",
+        "id": "gpt-4o",
+        "endpoint": "http://gateway.default.svc.cluster.local:8000",
+        "priority": 50
+      }
+    }
+  },
+  "tools": [],
+  "paths": {
+    "workspace": "/workspace",
+    "repoDir": null,
+    "workDir": "/workspace",
+    "home": "/workspace/.home",
+    "stateDir": "/workspace/.coding-runtime",
+    "tmpDir": "/workspace/.tmp",
+    "cacheHome": "/workspace/.cache",
+    "dataHome": "/workspace/.local/share",
+    "configHome": "/workspace/.config",
+    "agentConfigPath": "/etc/agent/config.yaml"
+  }
+}

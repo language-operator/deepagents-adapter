@@ -5,5 +5,5 @@ __pycache__/
 .helm-packages/
 *.tgz
 .DS_Store
-.claude/settings.json
+.claude/settings.local.json
 .claude/worktrees/

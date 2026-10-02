@@ -275,6 +275,26 @@ def workspace_root() -> str:
     return os.environ.get("AGENT_REPO_DIR") or "/workspace"
 
 
+def workspace_relative(path: str, root: str) -> str:
+    """Rewrite a real path under ``root`` as a path relative to it; else unchanged.
+
+    The agent's filesystem root *is* the workspace, so a path under ``root`` would
+    otherwise be nested a second time (``/workspace/x`` landing at
+    ``/workspace/workspace/x``). With ``root="/workspace"``: ``/workspace`` → ``/``
+    and ``/workspace/a/b`` → ``/a/b``. The prefix is stripped once, and only on a
+    path boundary (``/workspace2/x`` is left alone), so a real ``workspace``
+    directory inside the workspace stays reachable as ``/workspace/workspace/x``.
+    """
+    root = root.rstrip("/")
+    if not root:  # root is "/": every path is already relative to it
+        return path
+    if path == root:
+        return "/"
+    if path.startswith(root + "/"):
+        return path[len(root):]
+    return path
+
+
 def execution_mode() -> str:
     """The agent's ``spec.execution.mode`` from ``AGENT_EXECUTION_MODE``.
 

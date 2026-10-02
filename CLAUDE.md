@@ -28,14 +28,18 @@ container** — the server is our own code and reads the config directly.
   No human-in-the-loop: the agent runs every tool without approval (deployers opt
   into an autonomous agent). Its `main()` runs uvicorn in-process so a task-mode
   run can stop the server and set the exit code; the server stays up during the run
-  because the pod's probes hit `/health` in both modes.
+  because the pod's probes hit `/health` in both modes. `WorkspaceBackend` confines
+  the agent's files to the workspace while keeping the pod's real paths
+  (`/workspace/x` is `/workspace/x`); it overrides two private deepagents methods,
+  so re-run its tests on a deepagents bump.
 - `entrypoint.sh` / `Dockerfile` — container build on `coding-runtime`'s **thin** base
   (`ARG BASE`, pinned by digest): uid 1000 `agent`, `tini` ENTRYPOINT, git/gh/glab/uv.
   **Never create a user or override ENTRYPOINT** (the server runs as `CMD`). Runtime
   venv is built `--no-dev`.
 - `tests/` — pytest suite over `agent_config.py`, including the vendored coding-runtime
   operator fixture corpus (`tests/fixtures/`, re-sync on base bumps), plus
-  `test_server.py` for the `Runner`'s finish signal (what task mode exits on).
+  `test_server.py` for the `Runner`'s finish signal (what task mode exits on) and
+  the `WorkspaceBackend` path mapping.
 - `chart/` — the `LanguageAgentRuntime` Helm chart (`Chart.yaml`, `values.yaml`).
 - `.github/workflows/` — `test.yaml`, `build-image.yaml`, `release-chart.yaml`.
 

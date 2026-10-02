@@ -58,6 +58,7 @@ from agent_config import (
     build_task,
     execution_mode,
     load_operator_config,
+    workspace_relative,
     workspace_root,
 )
 
@@ -77,6 +78,53 @@ AGENT_NAME = os.environ.get("AGENT_NAME", "agent")
 INDEX_HTML = (APP_DIR / "index.html").read_text(encoding="utf-8").replace(
     "__AGENT_NAME__", html.escape(AGENT_NAME)
 )
+
+
+class WorkspaceBackend(FilesystemBackend):
+    """The agent's filesystem: confined to the workspace, addressed by real paths.
+
+    ``virtual_mode`` confines every path under the root and blocks ``..``/``~``, so
+    an absolute path the model invents (``/home/user/x``) lands under the workspace
+    instead of on the read-only root fs. But it also treats the real path of the
+    workspace as just another path to nest: ``/workspace/x`` became
+    ``/workspace/workspace/x``, and listings came back root-relative (``/x``).
+
+    This subclass makes the agent's paths the pod's paths. On the way in, a path
+    under the real root is taken as-is, so ``/workspace/x``, ``/x`` and ``x`` are
+    the same file. On the way out (``ls``/``glob``/``grep``), paths are the real
+    ones. Everything else is the library's, including the confinement checks.
+
+    ``_resolve_path`` and ``_to_virtual_path`` are private to deepagents: every
+    input path goes through the first and every listed path through the second.
+    ``tests/test_server.py`` exercises them through the public methods.
+    """
+
+    def __init__(self, root_dir: str, **kwargs) -> None:
+        super().__init__(root_dir=root_dir, virtual_mode=True, **kwargs)
+        # The root as configured and as resolved; they differ when it is a symlink.
+        self._roots = tuple(dict.fromkeys((os.path.abspath(root_dir), str(self.cwd))))
+
+    def _relative(self, path: str) -> str:
+        for root in self._roots:
+            relative = workspace_relative(path, root)
+            if relative != path:
+                return relative
+        return path
+
+    def _resolve_path(self, key: str) -> Path:
+        return super()._resolve_path(self._relative(key))
+
+    def _to_virtual_path(self, path: Path) -> str:
+        virtual = super()._to_virtual_path(path)  # "/a/b"; raises outside the root
+        root = self._roots[0].rstrip("/")
+        if virtual == "/.":  # the root itself
+            return root or "/"
+        return root + virtual
+
+    def glob(self, pattern: str, path: str | None = None):
+        # A leading "/" anchors a pattern to the root, so "/workspace/**/*.md"
+        # needs the same treatment as a path.
+        return super().glob(self._relative(pattern), path)
 
 
 def _text_of(message) -> str:
@@ -493,12 +541,10 @@ async def lifespan(app: FastAPI):
                 model=model,
                 system_prompt=system_prompt or None,
                 tools=tools,
-                # virtual_mode=True: every path the agent uses is confined under
-                # root_dir (/workspace, the writable PVC) and '..'/'~' traversal is
-                # blocked. Without this an absolute path the model invents (e.g.
-                # /home/user/x) hits the read-only root fs. The agent's filesystem
-                # IS its workspace.
-                backend=FilesystemBackend(root_dir=root, virtual_mode=True),
+                # The agent's filesystem IS its workspace (/workspace, the writable
+                # PVC): every path is confined under it, and /workspace/x means the
+                # real /workspace/x. See WorkspaceBackend.
+                backend=WorkspaceBackend(root),
                 checkpointer=saver,
             )
             print(f"deepagents-adapter: agent ready (workspace={root}, checkpoints={db_path})")

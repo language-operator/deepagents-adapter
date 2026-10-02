@@ -82,6 +82,7 @@ def clean_env(monkeypatch):
         "AGENT_INSTRUCTIONS",
         "AGENT_PERSONA",
         "AGENT_REPO_DIR",
+        "AGENT_EXECUTION_MODE",
         "A2A_MODE",
         "A2A_SKILLS",
         "A2A_PEERS",
@@ -240,6 +241,23 @@ def test_workspace_root(monkeypatch):
     assert agent_config.workspace_root() == "/workspace"
     monkeypatch.setenv("AGENT_REPO_DIR", "/workspace/repo")
     assert agent_config.workspace_root() == "/workspace/repo"
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (None, "service"),  # operators that predate the variable don't set it
+        ("", "service"),
+        ("service", "service"),
+        ("task", "task"),
+        (" Task ", "task"),  # lower-cased + stripped
+        ("scheduled", "service"),  # anything but task keeps running
+    ],
+)
+def test_execution_mode(monkeypatch, value, expected):
+    if value is not None:
+        monkeypatch.setenv("AGENT_EXECUTION_MODE", value)
+    assert agent_config.execution_mode() == expected
 
 
 def test_persona_explicit_system_prompt(write_config):

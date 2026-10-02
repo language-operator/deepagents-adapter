@@ -4,7 +4,13 @@ This runtime does not wait to be asked. On startup it builds the agent from the
 operator-injected ``/etc/agent/config.yaml`` (via :mod:`agent_config`) and then
 **autonomously runs the agent's task** (its ``instructions``) as a single session,
 streaming every event to STDOUT — so ``kubectl logs`` is a real UI — and to any
-connected browser. It runs the task once, then idles (staying Ready for probes).
+connected browser. It runs the task once; what happens next depends on the agent's
+execution mode (``AGENT_EXECUTION_MODE``, see :func:`agent_config.execution_mode`):
+
+  * ``service`` (or unset) — idle, staying Ready for probes.
+  * ``task`` — stop the server and exit: ``0`` if the run completed, non-zero if it
+    failed or there was nothing to run. The server is still up *during* the run,
+    because the pod's probes hit ``/health`` in both modes.
 
 There is no human-in-the-loop: the agent calls every tool (file writes, MCP tools,
 peer delegation) without asking for approval. Deploying this runtime means opting
@@ -33,10 +39,12 @@ import asyncio
 import html
 import json
 import os
+import sys
 import uuid
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 
@@ -48,6 +56,7 @@ from agent_config import (
     build_peers,
     build_system_prompt,
     build_task,
+    execution_mode,
     load_operator_config,
     workspace_root,
 )
@@ -107,17 +116,24 @@ def _normalize(item) -> dict | None:
 
 
 class Runner:
-    """Owns the single autonomous run, broadcasting events to stdout + subscribers."""
+    """Owns the single autonomous run, broadcasting events to stdout + subscribers.
 
-    def __init__(self, agent, task: str):
+    ``on_finish(status)`` is called once the runner has nothing left to do: a run
+    ended (``completed`` / ``error``) or there was nothing to run (``idle``). A
+    cancelled run does not finish — ``restart`` cancels and starts another.
+    """
+
+    def __init__(self, agent, task: str, on_finish=None):
         self._agent = agent
         self._task = task
+        self._on_finish = on_finish
         self.thread_id = uuid.uuid4().hex
         self.status = "idle"          # idle | running | completed | error
         self.error: str | None = None
         self.events: list[dict] = []
         self._seq = 0
         self._subscribers: set[asyncio.Queue] = set()
+        self._closed = False
         self._run_task: asyncio.Task | None = None
 
     # -- broadcast ---------------------------------------------------------
@@ -139,6 +155,8 @@ class Runner:
         """Replay the run so far, then yield live events (deduped by seq)."""
         q: asyncio.Queue = asyncio.Queue()
         self._subscribers.add(q)
+        if self._closed:  # arrived after close(): replay, then end
+            q.put_nowait(None)
         backlog = list(self.events)
         last = backlog[-1]["seq"] if backlog else -1
         try:
@@ -150,20 +168,37 @@ class Runner:
                 except asyncio.TimeoutError:
                     yield {"type": "ping"}
                     continue
+                if ev is None:  # close()
+                    break
                 if ev["seq"] > last:
                     yield ev
         finally:
             self._subscribers.discard(q)
 
+    def close(self) -> None:
+        """End every ``/events`` stream, after it has delivered what was published.
+
+        A stream otherwise never ends, and an open one holds up server shutdown.
+        """
+        self._closed = True
+        for q in list(self._subscribers):
+            q.put_nowait(None)
+
     # -- lifecycle ---------------------------------------------------------
     def start(self) -> None:
         if self._agent is None:
             self._set_status("idle", "no model configured")
+            self._finished()
             return
         if not self._task:
             self._set_status("idle", "no task (instructions) provided")
+            self._finished()
             return
         self._run_task = asyncio.create_task(self._run())
+
+    def _finished(self) -> None:
+        if self._on_finish is not None:
+            self._on_finish(self.status)
 
     def _config(self) -> dict:
         return {"configurable": {"thread_id": self.thread_id}}
@@ -185,6 +220,7 @@ class Runner:
             raise
         except Exception as exc:  # surface to logs + UI instead of dying silently
             self._set_status("error", str(exc))
+        self._finished()
 
     async def restart(self) -> None:
         if self._run_task and not self._run_task.done():
@@ -418,7 +454,13 @@ async def lifespan(app: FastAPI):
     servers = build_mcp_servers(cfg)
     root = workspace_root()
 
+    task_mode = execution_mode() == "task"
     server_mode = a2a_mode() == "server"
+    if task_mode and server_mode:
+        # A task agent has no Service, so nothing could call a request-driven
+        # server and the run would never end. The task wins.
+        print("deepagents-adapter: A2A_MODE=server ignored in task mode — running the task instead")
+        server_mode = False
 
     tools = []
     if model is not None:
@@ -432,8 +474,9 @@ async def lifespan(app: FastAPI):
         # Peer-delegation tools sit alongside the MCP tools (A2A client side).
         tools += await build_peer_tools(cfg)
 
+    print(f"deepagents-adapter: mode={execution_mode()}")
     if model is None:
-        print("deepagents-adapter: no model resolved — runtime will idle")
+        print(f"deepagents-adapter: no model resolved — runtime will {'exit' if task_mode else 'idle'}")
     else:
         print(f"deepagents-adapter: model={model.model_name} via {model.openai_api_base}")
         print(f"deepagents-adapter: task={'yes' if task else 'none'} a2a_mode={a2a_mode() or 'autonomous'}")
@@ -460,7 +503,21 @@ async def lifespan(app: FastAPI):
             )
             print(f"deepagents-adapter: agent ready (workspace={root}, checkpoints={db_path})")
 
-        runner = Runner(agent, task)
+        def exit_with(status: str) -> None:
+            # Task mode: the run's outcome becomes the process exit code, which Argo
+            # turns into the run's phase. Anything short of a completed run fails it,
+            # including having nothing to run. Stopping uvicorn through its own flag
+            # (rather than a signal) is what lets main() choose that exit code.
+            app.state.exit_code = 0 if status == "completed" else 1
+            print(f"deepagents-adapter: task mode — run {status}, exiting {app.state.exit_code}")
+            server = getattr(app.state, "server", None)
+            if server is None:
+                print("deepagents-adapter: not started via `python server.py`; cannot exit by itself")
+                return
+            app.state.runner.close()  # let live viewers see the end, then let go of them
+            server.should_exit = True
+
+        runner = Runner(agent, task, on_finish=exit_with if task_mode else None)
         app.state.runner = runner
 
         if server_mode and agent is not None:
@@ -527,3 +584,31 @@ async def restart(request: Request):
     r: Runner = request.app.state.runner
     await r.restart()
     return {"ok": True, "thread_id": r.thread_id}
+
+
+def main() -> None:
+    """Serve until signalled (service) or until the run ends (task), then exit.
+
+    uvicorn runs in-process rather than through its CLI so that a task-mode run
+    can stop the server and decide the exit code. Signalling ourselves instead
+    would not do: uvicorn re-raises the signal after shutting down, so a
+    successful run would die with 143 and be recorded as Failed.
+    """
+    config = uvicorn.Config(
+        app,
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT") or 8080),
+        # An open /events stream never ends by itself; without a bound it would
+        # hold the shutdown (and so the task's exit) open indefinitely.
+        timeout_graceful_shutdown=5,
+    )
+    server = uvicorn.Server(config)
+    app.state.server = server
+    server.run()
+    if not server.started:
+        sys.exit(3)  # startup failed; same code the uvicorn CLI uses
+    sys.exit(getattr(app.state, "exit_code", 0))
+
+
+if __name__ == "__main__":
+    main()

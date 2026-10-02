@@ -271,6 +271,19 @@ def workspace_root() -> str:
     return os.environ.get("AGENT_REPO_DIR") or "/workspace"
 
 
+def execution_mode() -> str:
+    """The agent's ``spec.execution.mode`` from ``AGENT_EXECUTION_MODE``.
+
+    ``"task"`` means run the instructions once and exit; ``"service"`` means keep
+    running. The variable is the only signal the container gets (the pod is
+    identical in both modes), and anything but ``task`` is ``"service"``: operators
+    that predate the variable don't set it, and a service pod started before an
+    operator upgrade keeps its old environment.
+    """
+    mode = os.environ.get("AGENT_EXECUTION_MODE", "").strip().lower()
+    return "task" if mode == "task" else "service"
+
+
 # --------------------------------------------------------------------------- #
 # A2A (Agent2Agent) config translation
 #

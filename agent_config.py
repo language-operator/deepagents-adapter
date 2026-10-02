@@ -43,13 +43,17 @@ A2A_PROTOCOL_VERSION = "1.0"
 DEFAULT_AGENT_VERSION = "0.1.0"
 
 
-def load_operator_config(path: str = CONFIG_PATH) -> dict:
+def load_operator_config(path: str | None = None) -> dict:
     """Parse ``/etc/agent/config.yaml``; return ``{}`` if absent or unreadable.
 
     Mirrors the opencode seed-config behavior: a parse failure is logged-by-caller
     territory, but here we simply degrade to an empty dict so the runtime can fall
     back to env vars.
+
+    ``path`` defaults to :data:`CONFIG_PATH`, looked up at call time rather than
+    bound as the default, so patching the constant (as the tests do) takes effect.
     """
+    path = path or CONFIG_PATH
     if not os.path.exists(path):
         return {}
     try:

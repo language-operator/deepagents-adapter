@@ -187,6 +187,15 @@ def test_model_name_falls_back_to_crd_key(write_config):
     assert params["name"] == "claude-sonnet-4-6"
 
 
+def test_default_path_follows_patched_config_path(write_config):
+    # The server calls load_operator_config() bare. The default must be read at
+    # call time, or patching CONFIG_PATH does nothing and the tests that rely on
+    # it read the real /etc/agent/config.yaml (present in every agent pod).
+    write_config(FULL_CONFIG)
+    cfg = agent_config.load_operator_config()
+    assert cfg["agent"]["name"] == "research-agent"
+
+
 # --------------------------------------------------------------------------- #
 # Env-var fallback (no config file)
 # --------------------------------------------------------------------------- #

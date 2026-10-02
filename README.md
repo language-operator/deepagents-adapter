@@ -16,7 +16,8 @@ A **single combined image** plus a **Helm chart** that registers a
   (planning, sub-agents, virtual filesystem, MCP tools) pointed at the cluster
   LiteLLM gateway, and **autonomously runs the agent's task** (its `instructions`)
   once, streaming every event to **STDOUT** (so `kubectl logs` is the primary UI)
-  and to a live browser view. Then it idles. **No init container** — unlike the
+  and to a live browser view. Then it idles (service mode) or exits (task mode) —
+  see [Execution modes](#execution-modes). **No init container** — unlike the
   CLI-wrapping runtimes, the server is our own code and reads the config directly.
   - Built on [`coding-runtime`](https://github.com/language-operator/coding-runtime)'s
     **thin** base: runs as uid 1000 under `tini`, with `git`, `gh` and `glab`
@@ -62,6 +63,26 @@ spec:
 The agent runs its `instructions` on startup. Watch it with `kubectl logs`, or
 `kubectl port-forward` and open `/` for the live view (streaming output and Restart).
 
+## Execution modes
+
+The runtime supports both `spec.execution.mode` values. It learns the mode from the
+`AGENT_EXECUTION_MODE` env var the operator injects, and treats an unset value as
+`service`.
+
+| Mode | After the run | Use it for |
+| ---- | ------------- | ---------- |
+| `service` (default) | Keeps serving: `/health` stays Ready, the live view and `POST /restart` stay available. | A long-lived agent you watch or re-run by hand. |
+| `task` | Stops the server and exits, so the run completes. | Scheduled or one-off runs (`spec.execution.schedule`). |
+
+In task mode the exit code is the run's result: `0` when the run completed, `1` when it
+failed or there was nothing to run (no model resolved, or no `instructions`). The
+server is still up *during* a task run — the pod's probes hit `/health` in both modes —
+so `kubectl logs` and the live view work the same way until it exits.
+
+Task mode needs an operator that injects `AGENT_EXECUTION_MODE`. On an older operator
+the variable is missing, the runtime behaves as a service, and a task run never
+completes; set `spec.execution.activeDeadlineSeconds` as a backstop.
+
 ## A2A (Agent2Agent)
 
 deepagents agents can delegate to each other natively over
@@ -72,7 +93,8 @@ Two roles, set via env (the operator injects them per `LanguageAgent`):
 
 **Server (the "specialist")** — `A2A_MODE=server` makes the runtime *request-driven*:
 it serves an Agent Card and answers JSON-RPC calls instead of auto-running
-`instructions`.
+`instructions`. Service mode only: a task agent has no Service to be called on, so
+in task mode `A2A_MODE=server` is ignored (with a log line) and the task runs.
 
 - `GET /.well-known/agent-card.json` — the Agent Card (name, in-cluster `url`,
   version, capabilities, and `skills`).

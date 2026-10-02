@@ -11,6 +11,8 @@ openclaw), this is an **autonomous executor**: at startup it reads the
 operator-injected `/etc/agent/config.yaml`, builds a deepagents agent pointed at
 the cluster LiteLLM gateway, and runs the agent's `instructions` once — streaming
 every event to STDOUT (`kubectl logs` is the primary UI) and a live browser view.
+After the run it idles in service mode and exits in task mode
+(`AGENT_EXECUTION_MODE=task`: `0` if the run completed, `1` otherwise).
 
 It ships as a **single combined image** plus a **Helm chart** that registers a
 cluster-scoped `LanguageAgentRuntime` named `deepagents`. There is **no init
@@ -24,13 +26,16 @@ container** — the server is our own code and reads the config directly.
 - `server.py` — thin FastAPI server: `GET /health` (probe), `GET /` (live UI),
   `GET /events` (SSE replay + live), `GET /state`, `POST /restart`.
   No human-in-the-loop: the agent runs every tool without approval (deployers opt
-  into an autonomous agent).
+  into an autonomous agent). Its `main()` runs uvicorn in-process so a task-mode
+  run can stop the server and set the exit code; the server stays up during the run
+  because the pod's probes hit `/health` in both modes.
 - `entrypoint.sh` / `Dockerfile` — container build on `coding-runtime`'s **thin** base
   (`ARG BASE`, pinned by digest): uid 1000 `agent`, `tini` ENTRYPOINT, git/gh/glab/uv.
   **Never create a user or override ENTRYPOINT** (the server runs as `CMD`). Runtime
   venv is built `--no-dev`.
 - `tests/` — pytest suite over `agent_config.py`, including the vendored coding-runtime
-  operator fixture corpus (`tests/fixtures/`, re-sync on base bumps).
+  operator fixture corpus (`tests/fixtures/`, re-sync on base bumps), plus
+  `test_server.py` for the `Runner`'s finish signal (what task mode exits on).
 - `chart/` — the `LanguageAgentRuntime` Helm chart (`Chart.yaml`, `values.yaml`).
 - `.github/workflows/` — `test.yaml`, `build-image.yaml`, `release-chart.yaml`.
 

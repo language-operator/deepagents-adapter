@@ -25,8 +25,9 @@ port: 8080
 # env (operator-injected), not here. Reference:
 #   A2A_MODE=server   Request-driven: serve an Agent Card + JSON-RPC
 #                     (message/send, tasks/get) and DO NOT auto-run instructions.
-#                     Each request runs the agent on a fresh thread.
-#   A2A_SKILLS        Comma-separated skill ids advertised on the card (server mode).
+#                     Each request runs the agent on a fresh thread. Service mode
+#                     only: ignored when spec.execution.mode is task.
+#   A2A_SKILLS       Comma-separated skill ids advertised on the card (server mode).
 #                     Richer skills (name/description/tags) come from a config.yaml
 #                     `a2a.skills:` block.
 #   A2A_PUBLIC_URL    Override the card's advertised url (default: the in-cluster

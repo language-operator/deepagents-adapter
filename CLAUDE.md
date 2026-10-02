@@ -20,9 +20,9 @@ container** — the server is our own code and reads the config directly.
 
 ## Key files
 
-- `agent_config.py` — the pure config-translation core (model selection, persona
-  system prompt, task/instructions, MCP server map, A2A card/peers, env-var
-  fallbacks). **This is what the tests target** — keep it pure and side-effect free.
+- `agent_config.py` — the pure config-translation core (model selection, the gateway
+  credential from `MODEL_API_KEY`, persona system prompt, task/instructions, MCP
+  server map, A2A card/peers, env-var fallbacks). **This is what the tests target** — keep it pure and side-effect free.
 - `server.py` — thin FastAPI server: `GET /health` (probe), `GET /` (live UI),
   `GET /events` (SSE replay + live), `GET /state`, `POST /restart`.
   No human-in-the-loop: the agent runs every tool without approval (deployers opt

@@ -13,6 +13,10 @@ image:
 # Agents using this runtime sit behind the cluster OIDC proxy (when the cluster
 # enables auth). All LLM traffic routes through the injected MODEL_ENDPOINT
 # gateway, so the agent never holds real provider keys.
+#
+# The gateway credential is the placeholder `sk-langop-proxy` unless MODEL_API_KEY
+# is set on the LanguageAgent (spec.credentials or spec.deployment.env) — a
+# per-agent gateway key, so the gateway can attribute usage to that agent.
 auth:
   enabled: true
 

@@ -30,8 +30,14 @@ import yaml
 CONFIG_PATH = "/etc/agent/config.yaml"
 
 # Placeholder credential. The LiteLLM gateway holds the real provider keys; agents
-# never see them. The OpenAI-compatible client still requires *some* api_key.
+# never see them. The OpenAI-compatible client still requires *some* api_key, so
+# this is what is sent when no per-agent key is issued (see gateway_api_key).
 GATEWAY_API_KEY = "sk-langop-proxy"
+
+# Where a per-agent gateway key arrives when one is issued. The operator does not
+# inject it; it reaches the container through spec.credentials or
+# spec.deployment.env. Same variable coding-runtime uses for the CLI adapters.
+GATEWAY_API_KEY_VAR = "MODEL_API_KEY"
 
 # A2A protocol version this runtime advertises on its Agent Card (implemented by
 # the bundled a2a-sdk). Carried on the card's JSON-RPC interface. "1.0" is the
@@ -79,6 +85,17 @@ def select_primary_model(cfg: dict):
     return key, (models[key] or {})
 
 
+def gateway_api_key() -> str:
+    """The credential to send the gateway: ``MODEL_API_KEY``, else the placeholder.
+
+    A per-agent key (``sk-langop-<agent-id>.<signature>``) lets the gateway
+    attribute usage to this agent; the placeholder makes every agent in the
+    namespace look the same. Unset, empty and whitespace-only all mean "no key
+    issued". Read at call time, and never logged by this runtime.
+    """
+    return os.environ.get(GATEWAY_API_KEY_VAR, "").strip() or GATEWAY_API_KEY
+
+
 def resolve_model(cfg: dict):
     """Resolve the model name + gateway base_url, or ``None`` if undeterminable.
 
@@ -86,7 +103,7 @@ def resolve_model(cfg: dict):
     key (the operator routes LiteLLM on the names carried in ``LLM_MODEL``). When
     no models section exists, fall back to the first name in ``LLM_MODEL`` and the
     ``MODEL_ENDPOINT`` env var. The base_url always has ``/v1`` appended — the
-    gateway is OpenAI-compatible.
+    gateway is OpenAI-compatible. The ``api_key`` is :func:`gateway_api_key`.
     """
     selected = select_primary_model(cfg)
     if selected is not None:
@@ -103,7 +120,7 @@ def resolve_model(cfg: dict):
     return {
         "name": name,
         "base_url": endpoint.rstrip("/") + "/v1",
-        "api_key": GATEWAY_API_KEY,
+        "api_key": gateway_api_key(),
     }
 
 

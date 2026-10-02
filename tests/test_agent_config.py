@@ -77,6 +77,7 @@ def write_config(tmp_path, monkeypatch):
 def clean_env(monkeypatch):
     for var in (
         "MODEL_ENDPOINT",
+        "MODEL_API_KEY",
         "LLM_MODEL",
         "MCP_SERVERS",
         "AGENT_INSTRUCTIONS",
@@ -112,6 +113,35 @@ def test_full_config_build_model_instance(write_config):
     model = agent_config.build_model(cfg)
     assert model.model_name == "claude-sonnet-4-6"
     assert model.openai_api_base == "http://gateway.default.svc.cluster.local:8000/v1"
+
+
+# --------------------------------------------------------------------------- #
+# Gateway credential: MODEL_API_KEY (per-agent key), else the placeholder
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (None, "sk-langop-proxy"),  # no key issued
+        ("", "sk-langop-proxy"),
+        ("   ", "sk-langop-proxy"),  # whitespace-only is not a key
+        ("sk-langop-agent1.0123abcd", "sk-langop-agent1.0123abcd"),
+        (" sk-langop-agent1.0123abcd\n", "sk-langop-agent1.0123abcd"),  # stripped
+    ],
+)
+def test_gateway_api_key(monkeypatch, write_config, value, expected):
+    if value is not None:
+        monkeypatch.setenv("MODEL_API_KEY", value)
+    assert agent_config.gateway_api_key() == expected
+    cfg = agent_config.load_operator_config(write_config(FULL_CONFIG))
+    assert agent_config.resolve_model(cfg)["api_key"] == expected
+
+
+def test_gateway_api_key_reaches_the_client_without_showing_in_its_repr(monkeypatch, write_config):
+    monkeypatch.setenv("MODEL_API_KEY", "sk-langop-agent1.0123abcd")
+    cfg = agent_config.load_operator_config(write_config(FULL_CONFIG))
+    model = agent_config.build_model(cfg)
+    assert model.openai_api_key.get_secret_value() == "sk-langop-agent1.0123abcd"
+    assert "0123abcd" not in repr(model)
 
 
 def test_full_config_system_prompt_is_persona_only(write_config):
@@ -479,7 +509,14 @@ def test_corpus_primary_model(name, monkeypatch):
         return
     assert params["name"] == primary["id"]
     assert params["base_url"] == golden["gateway"]["openaiBaseUrl"]
-    assert params["api_key"] == golden["gateway"]["apiKey"]
+    # A golden carries a per-agent key as an opaque `$(MODEL_API_KEY)` reference
+    # (null when none is issued) next to the placeholder; this runtime sends the
+    # resolved value, so resolve the reference against the fixture's env.
+    ref = golden["gateway"]["apiKeyRef"]
+    expected = golden["gateway"]["apiKey"]
+    if ref:
+        expected = agent_config._ENV_REF.sub(lambda m: os.environ.get(m.group(1), ""), ref)
+    assert params["api_key"] == expected
 
 
 @pytest.mark.parametrize("name", CORPUS)

@@ -49,6 +49,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 
 from agent_config import (
+    GATEWAY_API_KEY,
+    GATEWAY_API_KEY_VAR,
     a2a_mode,
     build_a2a_card,
     build_mcp_servers,
@@ -57,6 +59,7 @@ from agent_config import (
     build_system_prompt,
     build_task,
     execution_mode,
+    gateway_api_key,
     load_operator_config,
     workspace_relative,
     workspace_root,
@@ -527,6 +530,10 @@ async def lifespan(app: FastAPI):
         print(f"deepagents-adapter: no model resolved — runtime will {'exit' if task_mode else 'idle'}")
     else:
         print(f"deepagents-adapter: model={model.model_name} via {model.openai_api_base}")
+        # Which credential, never its value: this is what to check when the gateway
+        # is not attributing usage to this agent.
+        per_agent = gateway_api_key() != GATEWAY_API_KEY
+        print(f"deepagents-adapter: gateway key: {f'per-agent ({GATEWAY_API_KEY_VAR})' if per_agent else 'placeholder'}")
         print(f"deepagents-adapter: task={'yes' if task else 'none'} a2a_mode={a2a_mode() or 'autonomous'}")
 
     ckpt_dir = os.path.join(root, ".deepagents")

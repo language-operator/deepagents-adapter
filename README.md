@@ -88,6 +88,19 @@ Task mode needs an operator that injects `AGENT_EXECUTION_MODE`. On an older ope
 the variable is missing, the runtime behaves as a service, and a task run never
 completes; set `spec.execution.activeDeadlineSeconds` as a backstop.
 
+## Gateway credentials
+
+All model traffic goes to the cluster gateway (`MODEL_ENDPOINT`), which holds the real
+provider keys. By default the runtime sends the gateway the placeholder key
+`sk-langop-proxy`, so every agent in a namespace looks the same to it.
+
+Set `MODEL_API_KEY` on the `LanguageAgent` (through `spec.credentials` or
+`spec.deployment.env`) to send a per-agent gateway key instead. A gateway with
+per-agent keys enabled then attributes usage to that agent. Unset, empty or
+whitespace-only falls back to the placeholder. The startup log says which is in use
+(`gateway key: per-agent (MODEL_API_KEY)` or `gateway key: placeholder`) and never
+prints the value.
+
 ## A2A (Agent2Agent)
 
 deepagents agents can delegate to each other natively over

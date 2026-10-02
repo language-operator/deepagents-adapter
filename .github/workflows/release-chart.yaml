@@ -33,6 +33,25 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} \
             --username ${{ github.actor }} --password-stdin
 
+      # The tag-only trigger above does not cover everything: workflow_dispatch runs
+      # against any ref, and a re-pushed tag fires again. Either would overwrite a
+      # published version in place, and the umbrella chart's Chart.lock cannot tell
+      # a rewritten tarball from the original. Publishing a version that already
+      # exists is always a mistake, so refuse it here.
+      #
+      # This is a lint, not a barrier. It reads any `helm show` failure as "not
+      # published", so a registry hiccup, an auth failure or a rate limit all look
+      # like a clear runway and it proceeds. It catches a forgotten bump.
+      - name: Refuse to overwrite a published version
+        run: |
+          name="$(awk '/^name:/ {print $2; exit}' chart/Chart.yaml)"
+          version="$(awk '/^version:/ {print $2; exit}' chart/Chart.yaml)"
+          echo "chart: $name $version"
+          if helm show chart "${{ env.CHART_REPO }}/$name" --version "$version" >/dev/null 2>&1; then
+            echo "::error::$name $version is already published — bump the version in chart/Chart.yaml"
+            exit 1
+          fi
+
       - name: Package and push chart
         run: |
           helm package chart -d .helm-packages

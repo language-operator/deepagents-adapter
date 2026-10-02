@@ -52,6 +52,11 @@ container** — the server is our own code and reads the config directly.
 - **No Python linter** is configured. CI correctness == the three `test.yaml` jobs:
   `pytest`, `image-test` (conformance suite against the built image) and `chart-lint` (`helm lint chart` +
   `helm template deepagents chart`).
+- What to run for a change:
+  - always `make test` (`pytest`);
+  - `Dockerfile` touched → `make conformance` (`image-test`);
+  - chart touched → `helm lint chart && helm template deepagents chart >/dev/null` (`chart-lint`).
+- The PR title must be a conventional commit (`feat:`, `fix:`, `chore:`, `docs:`, `test:`).
 
 ## Build & dev deploy
 
@@ -71,10 +76,28 @@ release notes, breaking changes first. Pushing a `v*` tag triggers `build-image.
 
 ## Issue-driven workflow
 
-`/iterate [#issue] [--auto]` (`.claude/commands/iterate.md`) handles **one issue**
-per run: pick the next issue (or `#issue`) → worktree → plan → implement → test →
-PR → poll CI → squash-merge → close, then stop. The plan pauses for approval, or is
-posted as an issue comment when `--auto` is passed or `AGENT_NAME` is set. Work
-happens inside a git worktree under `.claude/worktrees/`. The command body and the
-`iterate/*.sh` scripts are the org's canonical copy (language-operator#932) — only
-the frontmatter `allowed-tools` and the `## Testing` section are repo-specific.
+`/iterate [#issue] [--auto]` handles **one issue** per run: pick the next issue (or
+`#issue`) → worktree → plan → implement → test → PR → poll CI → squash-merge → close,
+then stop. The plan pauses for approval, or is posted as an issue comment when `--auto`
+is passed. Work happens inside a git worktree under `.claude/worktrees/`.
+
+It comes from the shared `langop` plugin in
+[`language-operator/skills`](https://github.com/language-operator/skills), pinned to a tag
+in `.claude/settings.json` — not from a copy in this repo, which is what it replaced.
+`/iterate` and `/langop:iterate` both invoke it. There is nothing per-repo in the skill
+itself: it reads `## Testing` above to learn how to test a change here, so keep that section
+accurate.
+
+Interactive sessions need no install step — the plugin loads at the pinned tag once the folder
+is trusted. Non-interactive ones (`claude -p`, scheduled or in-cluster agents) have no trust
+dialog, so they need this once, with the tag the repo pins:
+
+```bash
+claude plugin marketplace add 'language-operator/skills#v0.1.0'
+claude plugin install langop@language-operator --scope project
+```
+
+Two things to avoid: a marketplace add without `#<tag>` follows `main` rather than the pin,
+and `--scope project` on the *marketplace* add rewrites `.claude/settings.json` and drops
+its `ref`. To take a newer release, change `ref` there. Machine-specific permissions belong
+in the untracked `.claude/settings.local.json`.

@@ -147,7 +147,8 @@ Three GitHub Actions workflows (`.github/workflows/`):
 - **build-image.yaml** — builds and pushes the image to `ghcr.io` with a
   `docker/metadata-action` tag matrix (on `main` and `v*` tags).
 - **release-chart.yaml** — `helm package` + `helm push` to
-  `oci://ghcr.io/language-operator/charts` (on `main` and `v*` tags).
+  `oci://ghcr.io/language-operator/charts` (on `v*` tags only). It refuses to push a
+  chart version that is already published.
 
 Cut a release with the `/release major|minor|patch` command
 (`.claude/commands/release.md`): it bumps `chart/Chart.yaml` version/appVersion +

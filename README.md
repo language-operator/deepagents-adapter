@@ -32,6 +32,11 @@ A **single combined image** plus a **Helm chart** that registers a
     skills / peer map, env-var fallbacks). This is what the tests target.
   - Session state persists across restarts via a LangGraph SQLite checkpointer on
     the `/workspace` PVC.
+  - **Paths.** The agent's filesystem is its workspace (`/workspace`, or the cloned
+    repo when there is one), and it uses the pod's real paths: `/workspace/notes.txt`,
+    `/notes.txt` and `notes.txt` are the same file, and listings show
+    `/workspace/notes.txt`. Any other absolute path stays confined to the workspace
+    (`/home/user/x` lands at `/workspace/home/user/x`), and `..` is refused.
 - **Chart** (`chart/`) — a cluster-scoped `LanguageAgentRuntime` named `deepagents`
   (single image, httpGet `/health` probes, no init container).
 

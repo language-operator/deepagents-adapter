@@ -253,6 +253,28 @@ def test_workspace_root(monkeypatch):
 
 
 @pytest.mark.parametrize(
+    "path, root, expected",
+    [
+        ("/workspace", "/workspace", "/"),  # the root itself
+        ("/workspace/story.txt", "/workspace", "/story.txt"),
+        ("/workspace/a/b.md", "/workspace", "/a/b.md"),
+        # stripped once: a real `workspace` dir inside the workspace stays reachable
+        ("/workspace/workspace/x", "/workspace", "/workspace/x"),
+        ("/workspace2/x", "/workspace", "/workspace2/x"),  # prefix, but not on a path boundary
+        ("/home/user/x", "/workspace", "/home/user/x"),  # unrelated absolute path
+        ("/story.txt", "/workspace", "/story.txt"),  # already relative to the root
+        ("story.txt", "/workspace", "story.txt"),
+        ("/workspace/repo/src/a.py", "/workspace/repo", "/src/a.py"),  # AGENT_REPO_DIR root
+        ("/workspace/other", "/workspace/repo", "/workspace/other"),  # outside that root
+        ("/workspace/x", "/workspace/", "/x"),  # trailing slash on the root
+        ("/a/b", "/", "/a/b"),  # root "/" is a no-op
+    ],
+)
+def test_workspace_relative(path, root, expected):
+    assert agent_config.workspace_relative(path, root) == expected
+
+
+@pytest.mark.parametrize(
     "value, expected",
     [
         (None, "service"),  # operators that predate the variable don't set it
